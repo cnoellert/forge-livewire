@@ -16,7 +16,21 @@ Remaining Action follow-ups: creatable media nodes (`add_media`), other
 schematic-bearing nodes (GMask Tracer), and a parent-vs-sibling choice
 on the mode keys if artists want it.
 
-## 2. Action input capture → auto-wire into maps (BIG)
+## 2. Matchbox / OFX / user-bin indexing
+
+Flame's native search lists `Lens_Blur - User` and `ColourCorrect -
+Matchbox`; livewire lists only the 99 `flame.batch.node_types`. Index:
+- Matchbox shaders: scan the shader dirs (`/opt/Autodesk/presets/<ver>/
+  matchbox/shaders`, project/user matchbox paths); names + shader path
+  from the XML sidecars. Commit = create `Matchbox` node + load shader
+  (`node.load_node_setup()` / matchbox path attribute — verify API).
+- OFX: enumerate installed OFX plugins (verify what the python API
+  exposes; worst case parse the OFX cache).
+- User node setups/presets: user's node bin saves.
+Entries get a suffix tag like the native browser. Index at install,
+refresh lazily.
+
+## 3. Action input capture → auto-wire into maps (BIG)
 
 The flagship follow-up. Capture everything feeding an Action's
 Batch-side inputs — beauty, normals, motion vectors, position, ID,
@@ -44,7 +58,7 @@ Building blocks and open questions (probe sessions required):
   scan inputs, show input → map-type table with guesses pre-filled,
   Enter wires the lot.
 
-## 3. Source-socket inference
+## 4. Source-socket inference
 
 Today the grabbed output socket isn't sensed — `Result`/first is assumed
 (M-mode guesses the matte output). FINDINGS shows a socket grab reads as
@@ -56,20 +70,6 @@ Approach: probe session grabbing every output of multi-output nodes
 (Action, Master Keyer, Clamp) at a few zoom levels; if x-offset ranks
 sockets left-to-right reliably, map offset rank → `output_sockets` index.
 Fallback stays the combo. Watch zoom dependence — offsets may scale.
-
-## 4. Matchbox / OFX / preset indexing
-
-Flame's native search lists `Lens_Blur - User` and `ColourCorrect -
-Matchbox`; livewire lists only the 99 `flame.batch.node_types`. Index:
-- Matchbox shaders: scan the shader dirs (`/opt/Autodesk/presets/<ver>/
-  matchbox/shaders`, project/user matchbox paths); names + shader path
-  from the XML sidecars. Commit = create `Matchbox` node + load shader
-  (`node.load_node_setup()` / matchbox path attribute — verify API).
-- OFX: enumerate installed OFX plugins (verify what the python API
-  exposes; worst case parse the OFX cache).
-- User node setups/presets: user's node bin saves.
-Entries get a suffix tag like the native browser. Index at install,
-refresh lazily.
 
 ## 5. Favorites / recents
 
@@ -91,7 +91,7 @@ distance in schematic space; threshold similar to GRAB_RADIUS.
 ## 7. Branch-from-input (pull upstream)
 
 Grabbing an *input* socket (top edge — offset sign should distinguish it
-from outputs, same probe as item 2) and dropping on empty = "create a
+from outputs, same probe as item 4) and dropping on empty = "create a
 node feeding this input": browser commit wires new node's Result into
 the grabbed input. Mirrors ComfyUI's reverse drag.
 
@@ -101,7 +101,7 @@ Constants out of source: arm-key vkeys, theme, radius, verbosity into a
 JSON config with per-user override. Then a proper deploy path for a
 studio: one shared checkout + symlinked hook per workstation, version
 tag, and eventually a Logik portal submission (which effectively
-requires items 4 and 5 for feature parity with expectations).
+requires items 2 and 5 for feature parity with expectations).
 
 ## 9. Linux backend
 
@@ -122,9 +122,9 @@ behavior.
 - `create_node` + `connect_nodes` are separate undo steps; investigate
   grouping so one Ctrl+Z removes the committed node cleanly.
 - Grab radius is zoom-naive (150 schematic units regardless of view
-  scale); if zoom is recoverable from socket-offset work (item 3), scale
+  scale); if zoom is recoverable from socket-offset work (item 4), scale
   it.
 - Browser list is capped at `MAX_ROWS * 4` entries with no scrollbar;
-  fine at 99 types, revisit after item 4 grows the list.
+  fine at 99 types, revisit after item 2 grows the list.
 - ISO keyboards: F/M are safe, but any future punctuation arm-key needs
   the vkey caveat from the README.
