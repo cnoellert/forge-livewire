@@ -24,8 +24,8 @@ THEMES = {
         "panel_bg": "#262626", "panel_border": "#4e4e4e", "radius": "0px",
         "field_bg": "#131313", "field_border": "#5a5a5a",
         "field_focus": "#8a8a8a", "field_fg": "#d6d6d6",
-        "row_fg": "#c0c0c0", "hover": "#333333",
-        "alt_bg": "#24393e",
+        "row_fg": "#c0c0c0", "hover": "#3a3d42",
+        "alt_bg": "#2e3033",
         "sel_bg": "#57595b", "sel_fg": "#f2f2f2",
         "header_fg": "#909090",
     },
@@ -135,8 +135,8 @@ class NodeBrowser(QtWidgets.QWidget):
         if source and source.get("name"):
             header = QtWidgets.QLabel(self)
             header.setObjectName("header")
-            suffix = u"  ·  front+matte" if matte_mode else u""
-            header.setText(u"⤷ from  %s%s" % (source["name"], suffix))
+            suffix = u"  (front+matte)" if matte_mode else u""
+            header.setText(u"from  %s%s" % (source["name"], suffix))
             header.setTextFormat(QtCore.Qt.PlainText)
             lay.addWidget(header)
             sockets = source.get("sockets") or []
