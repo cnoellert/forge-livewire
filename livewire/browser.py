@@ -25,6 +25,7 @@ THEMES = {
         "field_bg": "#131313", "field_border": "#5a5a5a",
         "field_focus": "#8a8a8a", "field_fg": "#d6d6d6",
         "row_fg": "#c0c0c0", "hover": "#333333",
+        "alt_bg": "#24393e",
         "sel_bg": "#57595b", "sel_fg": "#f2f2f2",
         "header_fg": "#909090",
     },
@@ -33,6 +34,7 @@ THEMES = {
         "field_bg": "#1c1c1c", "field_border": "#3d3d3d",
         "field_focus": "#E87E24", "field_fg": "#d9d9d9",
         "row_fg": "#b8b8b8", "hover": "#383838",
+        "alt_bg": "#313131",
         "sel_bg": "#E87E24", "sel_fg": "#141414",
         "header_fg": "#E87E24",
     },
@@ -80,6 +82,7 @@ QComboBox QAbstractItemView {
 }
 QListWidget {
     background: transparent;
+    alternate-background-color: %(alt_bg)s;
     color: %(row_fg)s;
     border: none;
     font-family: "Discreet";
@@ -154,6 +157,7 @@ class NodeBrowser(QtWidgets.QWidget):
         lay.addWidget(self._edit)
 
         self._list = QtWidgets.QListWidget(self)
+        self._list.setAlternatingRowColors(True)
         self._list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self._list.itemActivated.connect(lambda _i: self._commit())
         self._list.itemClicked.connect(lambda _i: self._commit())

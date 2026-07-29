@@ -21,8 +21,9 @@ except Exception:
 
 from . import browser
 
-# macOS virtual keycodes: Tab=48, backtick/grave=50, F1..: 122...
-HOTKEY_VKEY = 48
+# macOS virtual keycodes: backtick/grave=50, Tab=48 (conflicts: Flame tabs
+# the schematic between node types), section-sign=10 on ISO keyboards.
+HOTKEY_VKEY = 50
 TICK_MS = 30
 GRAB_RADIUS = 150.0    # schematic units: max grab-point distance to a node anchor
 EARLY_SAMPLES = 6      # drag samples considered part of the grab point
