@@ -73,6 +73,14 @@ livewire.install()
 The new node is created at the exact schematic position where you dropped
 the noodle and connected per the table above.
 
+**Inside an Action schematic** the same gesture works: drag a link, tap
+**F or M** (equivalent there), release. The browser lists Action's node
+types (Axis, Light, Surface, GMask, …), the header reads
+`parent <node>`, and the pick is created at the drop point as a child of
+the grabbed node — or unparented if you grabbed empty space. Livewire
+detects per-drag which schematic is active; no mode switching. Media
+nodes can be grab sources but are not creatable from the browser yet.
+
 The header line shows what you're about to do — e.g.
 `from cc1 (to matte)`. If the source node has more than one output
 socket, a menu above the search field lets you override which output

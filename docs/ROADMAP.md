@@ -6,27 +6,15 @@ cold. Background for all of it: [FINDINGS.md](FINDINGS.md) — and the probe
 ([`livewire/probe.py`](../livewire/probe.py)) is the tool for answering the
 open questions below empirically, the same way v0.1 was derived.
 
-## 1. Action schematic support
+## 1. Action schematic support — ✅ shipped 2026-07-29
 
-Batch isn't the only schematic — Action is the other place artists live,
-and its node bin is a modal interruption in a way Batch's isn't. Same
-gesture: pull from an Action node, tap a key, get a browser of Action
-node types (Axis, Light, Surface, GMask, …), auto-parented at the drop
-point.
-
-Open questions (probe session required):
-- Does `flame.batch.cursor_position` report while the Action schematic
-  has the pointer, and in which coordinate space? If not, is there an
-  equivalent on the Action object?
-- Action python API: node positions exist on Action objects — confirm
-  attribute names and coordinate space match what the cursor reports.
-- Connections are parent/child (`node.parent` / assign), not sockets —
-  the commit path differs: `action.create_node(type)` + parenting, and
-  "front/matte" semantics don't apply. Mode keys would instead pick
-  parent-under vs sibling.
-- Detecting *which* schematic is under the cursor (Batch vs Action) so
-  one detector serves both. `flame.batch.current_node` type +
-  which view has the pointer may be enough.
+Same gesture inside an open Action: link-drag + F/M → browser of the 55
+Action node types → child of the grabbed node at the drop point (or
+unparented from an empty-space grab). Per-drag surface detection via
+cursor-feed divergence + liveness (see FINDINGS "Action schematic").
+Remaining Action follow-ups: creatable media nodes (`add_media`), other
+schematic-bearing nodes (GMask Tracer), and a parent-vs-sibling choice
+on the mode keys if artists want it.
 
 ## 2. Source-socket inference
 

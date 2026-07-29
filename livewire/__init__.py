@@ -3,7 +3,7 @@
 import os
 import sys
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 # Flame's embedded Python does not ship PyObjC; use the vendored copy
 # (see README "Install" for the one-time bootstrap that creates it).
