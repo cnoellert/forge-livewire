@@ -250,14 +250,22 @@ def _fire(release_guess, source, mode, surface, act_obj):
 
 
 def _decide_surface():
-    """Called once, at arm time. Returns (surface, source)."""
+    """Called once, at arm time. Returns (surface, source).
+
+    The Action surface is chosen when its cursor feed diverged from the
+    Batch feed AND is live — either it moved during the drag, or the grab
+    point resolves to an Action node. A stale feed (Action selected in
+    Batch but its schematic never opened) is frozen and far from any
+    node, so it fails both tests and falls through to Batch.
+    """
     bat_samples = [p[0] for p in _pairs if p[0] is not None]
     act_samples = [p[1] for p in _pairs if p[1] is not None]
     diverged = any(p[0] is not None and p[1] is not None and p[0] != p[1]
                    for p in _pairs)
-    if _act_map and diverged:
+    if _act_name is not None and diverged:
         src = _find_source(act_samples, _act_map, with_sockets=False)
-        if src is not None:
+        act_moving = len(set(act_samples)) >= 2
+        if src is not None or act_moving:
             return {"kind": "action", "action": _act_name}, src
     return ({"kind": "batch"},
             _find_source(bat_samples, _bat_map, with_sockets=True))
