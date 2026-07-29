@@ -3,7 +3,7 @@
 import os
 import sys
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Flame's embedded Python does not ship PyObjC; use the vendored copy
 # (see README "Install" for the one-time bootstrap that creates it).
@@ -16,3 +16,4 @@ except ImportError:
         sys.path.insert(0, _vendor)
 
 from .detector import install, uninstall  # noqa: F401
+from .indexer import refresh as reindex  # noqa: F401

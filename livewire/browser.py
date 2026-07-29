@@ -95,26 +95,35 @@ QListWidget::item:hover { background: %(hover)s; }
 """ % THEMES[THEME]
 
 
-def _rank(query, name):
+def _match(query, text):
     """Lower is better; None means no match."""
-    q, n = query.lower(), name.lower()
+    q, n = query.lower(), text.lower()
     if not q:
-        return (3, n)
+        return 3
     if n.startswith(q):
-        return (0, n)
+        return 0
     if any(w.startswith(q) for w in n.split()):
-        return (1, n)
+        return 1
     if q in n:
-        return (2, n)
+        return 2
     it = iter(n)
     if all(c in it for c in q):
-        return (3, n)
+        return 3
     return None
+
+
+def _rank(query, entry):
+    """Sort key: match quality, then favorite, then Flame usage weight."""
+    m = _match(query, entry["display"])
+    if m is None:
+        return None
+    return (m, 0 if entry.get("fav") else 1, -entry.get("weight", 0),
+            entry["display"].lower())
 
 
 class NodeBrowser(QtWidgets.QWidget):
 
-    def __init__(self, node_types, source, on_commit, mode="front",
+    def __init__(self, entries, source, on_commit, mode="front",
                  kind="batch"):
         super().__init__(None, QtCore.Qt.Tool
                          | QtCore.Qt.FramelessWindowHint
@@ -124,7 +133,7 @@ class NodeBrowser(QtWidgets.QWidget):
         self.setStyleSheet(_QSS)
         self.setFixedWidth(WIDTH)
 
-        self._types = node_types
+        self._entries = entries
         self._on_commit = on_commit
         self._socket_combo = None
         self._committed = False
@@ -169,7 +178,7 @@ class NodeBrowser(QtWidgets.QWidget):
 
         self._list = QtWidgets.QListWidget(self)
         self._list.setAlternatingRowColors(True)
-        self._list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self._list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self._list.itemActivated.connect(lambda _i: self._commit())
         self._list.itemClicked.connect(lambda _i: self._commit())
         lay.addWidget(self._list)
@@ -180,14 +189,16 @@ class NodeBrowser(QtWidgets.QWidget):
 
     def _refilter(self, text):
         ranked = []
-        for t in self._types:
-            r = _rank(text, t)
+        for e in self._entries:
+            r = _rank(text, e)
             if r is not None:
-                ranked.append((r, t))
-        ranked.sort()
+                ranked.append((r, e))
+        ranked.sort(key=lambda re_: re_[0])
         self._list.clear()
-        for _r, t in ranked[:MAX_ROWS * 4]:
-            self._list.addItem(t)
+        for _r, e in ranked[:MAX_ROWS * 8]:
+            item = QtWidgets.QListWidgetItem(e["display"])
+            item.setData(QtCore.Qt.UserRole, e)
+            self._list.addItem(item)
         if self._list.count():
             self._list.setCurrentRow(0)
         rows = min(self._list.count(), MAX_ROWS)
@@ -227,10 +238,10 @@ class NodeBrowser(QtWidgets.QWidget):
         if item is None:
             return
         self._committed = True
-        node_type = item.text()
+        entry = item.data(QtCore.Qt.UserRole)
         socket = self._current_socket()
         self.close()
-        self._on_commit(node_type, socket)
+        self._on_commit(entry, socket)
 
     # Close when the user clicks away (Tool windows don't auto-dismiss
     # like Popup, but Popup can never become the macOS key window inside
@@ -263,9 +274,9 @@ def _force_key(w):
     w._edit.setFocus(QtCore.Qt.OtherFocusReason)
 
 
-def show_browser(node_types, source, on_commit, mode="front", kind="batch"):
+def show_browser(entries, source, on_commit, mode="front", kind="batch"):
     close_all()
-    w = NodeBrowser(node_types, source, on_commit, mode=mode, kind=kind)
+    w = NodeBrowser(entries, source, on_commit, mode=mode, kind=kind)
     pos = QtGui.QCursor.pos()
     screen = QtGui.QGuiApplication.screenAt(pos)
     w.adjustSize()

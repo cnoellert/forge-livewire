@@ -27,6 +27,7 @@ except Exception:
     AppKit = None
 
 from . import browser
+from . import indexer
 
 # Arm keys, polled only while a drag is in flight. In Batch, F routes the
 # connection into the new node's Front input, M into its Matte, both =
@@ -169,13 +170,46 @@ def _connect(src, out_sock, new, in_sock):
         flame.batch.connect_nodes(src, new)
 
 
-def _commit_batch(node_type, out_socket, cp, source, mode):
-    new = flame.batch.create_node(node_type)
+def _instantiate_batch(entry, cp):
+    """Create the picked entry in Batch at cp; return the head node."""
+    kind = entry.get("kind", "node")
+    if kind == "matchbox":
+        new = flame.batch.create_node("Matchbox", entry["payload"])
+    elif kind == "ofx":
+        new = flame.batch.create_node("OpenFX")
+        new.change_plugin(entry["payload"])
+    elif kind == "userbin":
+        before = set()
+        for n in _attr(flame.batch.nodes):
+            try:
+                before.add(str(_attr(n.name)))
+            except Exception:
+                pass
+        flame.batch.append_setup(entry["payload"])
+        added = [n for n in _attr(flame.batch.nodes)
+                 if str(_attr(n.name)) not in before]
+        if not added:
+            raise RuntimeError("append_setup added no nodes")
+        # move the whole group so its left edge lands at the drop point
+        xs = [float(_attr(n.pos_x)) for n in added]
+        ys = [float(_attr(n.pos_y)) for n in added]
+        dx, dy = int(cp[0] - min(xs)), int(cp[1] - (sum(ys) / len(ys)))
+        for n in added:
+            n.pos_x = int(float(_attr(n.pos_x)) + dx)
+            n.pos_y = int(float(_attr(n.pos_y)) + dy)
+        return min(added, key=lambda n: float(_attr(n.pos_x)))
+    else:
+        new = flame.batch.create_node(entry["payload"])
     try:
         new.pos_x = int(cp[0])
         new.pos_y = int(cp[1])
     except Exception:
         pass
+    return new
+
+
+def _commit_batch(entry, out_socket, cp, source, mode):
+    new = _instantiate_batch(entry, cp)
     if source and source.get("name"):
         src = flame.batch.get_node(source["name"])
         outs = source.get("sockets") or []
@@ -199,9 +233,9 @@ def _commit_batch(node_type, out_socket, cp, source, mode):
             _connect(src, out_socket, new, in_sock)
 
 
-def _commit_action(node_type, cp, source, action_name):
+def _commit_action(entry, cp, source, action_name):
     a = flame.batch.get_node(action_name)
-    new = a.create_node(node_type)
+    new = a.create_node(entry["payload"])
     try:
         new.pos_x = int(cp[0])
         new.pos_y = int(cp[1])
@@ -213,15 +247,15 @@ def _commit_action(node_type, cp, source, action_name):
             a.connect_nodes(src, new)
 
 
-def _commit(node_type, out_socket, cp, source, mode, surface):
+def _commit(entry, out_socket, cp, source, mode, surface):
     def do():
         try:
             if surface and surface.get("kind") == "action":
-                _commit_action(node_type, cp, source, surface["action"])
+                _commit_action(entry, cp, source, surface["action"])
             else:
-                _commit_batch(node_type, out_socket, cp, source, mode)
+                _commit_batch(entry, out_socket, cp, source, mode)
             _log("created %s at (%d, %d) [%s/%s]"
-                 % (node_type, cp[0], cp[1],
+                 % (entry["display"], cp[0], cp[1],
                     (surface or {}).get("kind", "batch"), mode))
         except Exception as e:
             print("[livewire] commit failed: %r" % e)
@@ -232,19 +266,22 @@ def _fire(release_guess, source, mode, surface, act_obj):
     def show():
         if surface and surface.get("kind") == "action":
             cp = _cpos_of(act_obj) if act_obj is not None else None
-            types = _action_types(act_obj) if act_obj is not None else []
+            entries = [{"display": t, "label": t, "kind": "action_node",
+                        "payload": t, "fav": False, "weight": 0}
+                       for t in (_action_types(act_obj)
+                                 if act_obj is not None else [])]
         else:
             cp = _cpos_of(flame.batch)
-            types = _node_types()
+            entries = indexer.entries(_node_types())
         cp = cp or release_guess
         if cp is None:
             return
         browser.show_browser(
-            node_types=types,
+            entries=entries,
             source=source,
             mode=mode,
             kind=(surface or {}).get("kind", "batch"),
-            on_commit=lambda ntype, sock: _commit(ntype, sock, cp, source,
+            on_commit=lambda entry, sock: _commit(entry, sock, cp, source,
                                                   mode, surface))
     QtCore.QTimer.singleShot(SETTLE_MS, show)
 
