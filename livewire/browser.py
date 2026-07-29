@@ -13,63 +13,83 @@ ROW_H = 24
 
 _open = []
 
-# Flame-native body (neutral charcoal, Discreet font, dense rows) with a
-# single forge signature: the E87E24 orange accent on selection and focus.
-ACCENT = "#E87E24"
-ACCENT_HI = "#f59035"
+# Two skins over identical geometry (Discreet font, dense flat rows):
+#   "flame" — faithful to Flame 2026's own node-search popup: neutral
+#             charcoal, square corners, light-gray selection bar.
+#   "forge" — same body, forge-orange E87E24 signature on selection/focus.
+THEME = "flame"
+
+THEMES = {
+    "flame": {
+        "panel_bg": "#262626", "panel_border": "#4e4e4e", "radius": "0px",
+        "field_bg": "#131313", "field_border": "#5a5a5a",
+        "field_focus": "#8a8a8a", "field_fg": "#d6d6d6",
+        "row_fg": "#c0c0c0", "hover": "#333333",
+        "sel_bg": "#57595b", "sel_fg": "#f2f2f2",
+        "header_fg": "#909090",
+    },
+    "forge": {
+        "panel_bg": "#2b2b2b", "panel_border": "#464646", "radius": "2px",
+        "field_bg": "#1c1c1c", "field_border": "#3d3d3d",
+        "field_focus": "#E87E24", "field_fg": "#d9d9d9",
+        "row_fg": "#b8b8b8", "hover": "#383838",
+        "sel_bg": "#E87E24", "sel_fg": "#141414",
+        "header_fg": "#E87E24",
+    },
+}
 
 _QSS = """
 #livewirePanel {
-    background: #2b2b2b;
-    border: 1px solid #464646;
-    border-radius: 3px;
+    background: %(panel_bg)s;
+    border: 1px solid %(panel_border)s;
+    border-radius: %(radius)s;
     font-family: "Discreet";
 }
 QLabel#header {
-    color: %(accent)s;
+    color: %(header_fg)s;
     font-family: "Discreet";
     font-size: 12px;
     padding: 1px 2px 0 2px;
 }
 QLineEdit {
-    background: #1c1c1c;
-    color: #d9d9d9;
-    border: 1px solid #3d3d3d;
-    border-radius: 2px;
+    background: %(field_bg)s;
+    color: %(field_fg)s;
+    border: 1px solid %(field_border)s;
+    border-radius: %(radius)s;
     padding: 5px 7px;
     font-family: "Discreet";
     font-size: 13px;
-    selection-background-color: %(accent)s;
-    selection-color: #141414;
+    selection-background-color: %(sel_bg)s;
+    selection-color: %(sel_fg)s;
 }
-QLineEdit:focus { border-color: %(accent)s; }
+QLineEdit:focus { border-color: %(field_focus)s; }
 QComboBox {
-    background: #1c1c1c;
-    color: #c4c4c4;
-    border: 1px solid #3d3d3d;
-    border-radius: 2px;
+    background: %(field_bg)s;
+    color: %(row_fg)s;
+    border: 1px solid %(field_border)s;
+    border-radius: %(radius)s;
     padding: 3px 7px;
     font-family: "Discreet";
     font-size: 12px;
 }
 QComboBox QAbstractItemView {
-    background: #222222;
-    color: #c4c4c4;
-    selection-background-color: %(accent)s;
-    selection-color: #141414;
+    background: %(panel_bg)s;
+    color: %(row_fg)s;
+    selection-background-color: %(sel_bg)s;
+    selection-color: %(sel_fg)s;
 }
 QListWidget {
     background: transparent;
-    color: #b8b8b8;
+    color: %(row_fg)s;
     border: none;
     font-family: "Discreet";
     font-size: 13px;
     outline: none;
 }
-QListWidget::item { padding: 3px 7px; border-radius: 2px; }
-QListWidget::item:selected { background: %(accent)s; color: #141414; }
-QListWidget::item:hover { background: #383838; }
-""" % {"accent": ACCENT}
+QListWidget::item { padding: 3px 7px; border-radius: %(radius)s; }
+QListWidget::item:selected { background: %(sel_bg)s; color: %(sel_fg)s; }
+QListWidget::item:hover { background: %(hover)s; }
+""" % THEMES[THEME]
 
 
 def _rank(query, name):
@@ -128,7 +148,7 @@ class NodeBrowser(QtWidgets.QWidget):
             self._sockets = []
 
         self._edit = QtWidgets.QLineEdit(self)
-        self._edit.setPlaceholderText("node type…")
+        self._edit.setPlaceholderText("Search for...")
         self._edit.textChanged.connect(self._refilter)
         self._edit.installEventFilter(self)
         lay.addWidget(self._edit)
