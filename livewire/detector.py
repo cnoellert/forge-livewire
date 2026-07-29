@@ -27,6 +27,13 @@ from . import browser
 # Tab tabs the schematic, backtick is assigned in Action.)
 KEY_FRONT = 3    # macOS vkey: F
 KEY_MATTE = 46   # macOS vkey: M
+
+VERBOSE = False  # arm/commit chatter in the shell; errors always print
+
+
+def _log(msg):
+    if VERBOSE:
+        print("[livewire] %s" % msg)
 TICK_MS = 30
 GRAB_RADIUS = 150.0    # schematic units: max grab-point distance to a node anchor
 EARLY_SAMPLES = 6      # drag samples considered part of the grab point
@@ -163,8 +170,8 @@ def _commit(node_type, out_socket, cp, source, mode):
                     in_sock = (_pick(ins, needle)
                                or (ins[0] if ins else None))
                     _connect(src, out_socket, new, in_sock)
-            print("[livewire] created %s at (%d, %d) [%s]"
-                  % (node_type, cp[0], cp[1], mode))
+            _log("created %s at (%d, %d) [%s]"
+                 % (node_type, cp[0], cp[1], mode))
         except Exception as e:
             print("[livewire] commit failed: %r" % e)
     flame.schedule_idle_event(do)
@@ -211,8 +218,8 @@ def _tick():
                     if not _armed:
                         _armed = True
                         _source = _find_source()
-                        print("[livewire] armed, source=%s"
-                              % (_source["name"] if _source else None))
+                        _log("armed, source=%s"
+                             % (_source["name"] if _source else None))
                     _to_front = _to_front or bool(f_down)
                     _to_matte = _to_matte or bool(m_down)
         elif _btn and not btn:
@@ -237,7 +244,7 @@ def _start():
     _timer = QtCore.QTimer()
     _timer.timeout.connect(_tick)
     _timer.start(TICK_MS)
-    print("[livewire] detector running (hotkey vkey=%d)" % HOTKEY_VKEY)
+    _log("detector running")
 
 
 def install():
@@ -251,5 +258,5 @@ def uninstall():
             _timer.stop()
             _timer = None
         browser.close_all()
-        print("[livewire] detector stopped")
+        _log("detector stopped")
     flame.schedule_idle_event(_stop)

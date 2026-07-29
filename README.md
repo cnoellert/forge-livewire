@@ -95,7 +95,8 @@ Everything lives in two files, plain constants at the top:
   note ANSI layout: on ISO/Nordic boards some punctuation keys report
   different codes), `GRAB_RADIUS` (how close, in schematic units, the
   grab must be to a node's position to identify it; default 150),
-  `TICK_MS` (poll rate, default 30 ms).
+  `TICK_MS` (poll rate, default 30 ms), `VERBOSE` (arm/commit messages
+  in the shell; off by default, errors always print).
 - [`livewire/browser.py`](livewire/browser.py) — `THEME`: `"flame"`
   (neutral greys matching the native node search, alternating rows in a
   cool Autodesk grey) or `"forge"` (forge-orange selection/focus
