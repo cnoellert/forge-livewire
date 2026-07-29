@@ -78,8 +78,10 @@ def _rank(query, name):
 
 class NodeBrowser(QtWidgets.QWidget):
 
-    def __init__(self, node_types, source, on_commit):
-        super().__init__(None, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
+    def __init__(self, node_types, source, on_commit, matte_mode=False):
+        super().__init__(None, QtCore.Qt.Tool
+                         | QtCore.Qt.FramelessWindowHint
+                         | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setObjectName("livewirePanel")
         self.setStyleSheet(_QSS)
@@ -88,6 +90,7 @@ class NodeBrowser(QtWidgets.QWidget):
         self._types = node_types
         self._on_commit = on_commit
         self._socket_combo = None
+        self._committed = False
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(8, 8, 8, 8)
@@ -96,11 +99,12 @@ class NodeBrowser(QtWidgets.QWidget):
         if source and source.get("name"):
             header = QtWidgets.QLabel(self)
             header.setObjectName("header")
-            header.setText(u"⤷ from  %s" % source["name"])
+            suffix = u"  ·  front+matte" if matte_mode else u""
+            header.setText(u"⤷ from  %s%s" % (source["name"], suffix))
             header.setTextFormat(QtCore.Qt.PlainText)
             lay.addWidget(header)
             sockets = source.get("sockets") or []
-            if len(sockets) > 1:
+            if len(sockets) > 1 and not matte_mode:
                 self._socket_combo = QtWidgets.QComboBox(self)
                 self._socket_combo.addItems(sockets)
                 if "Result" in sockets:
@@ -174,10 +178,20 @@ class NodeBrowser(QtWidgets.QWidget):
         item = self._list.currentItem()
         if item is None:
             return
+        self._committed = True
         node_type = item.text()
         socket = self._current_socket()
         self.close()
         self._on_commit(node_type, socket)
+
+    # Close when the user clicks away (Tool windows don't auto-dismiss
+    # like Popup, but Popup can never become the macOS key window inside
+    # Flame's natively-focused fullscreen app).
+    def changeEvent(self, ev):
+        if (ev.type() == QtCore.QEvent.ActivationChange
+                and not self.isActiveWindow() and not self._committed):
+            self.close()
+        super().changeEvent(ev)
 
     def closeEvent(self, ev):
         if self in _open:
@@ -185,9 +199,25 @@ class NodeBrowser(QtWidgets.QWidget):
         super().closeEvent(ev)
 
 
-def show_browser(node_types, source, on_commit):
+def _force_key(w):
+    """Make the popup the macOS key window; Flame's native fullscreen
+    window otherwise keeps keyboard focus and typing never reaches Qt."""
+    try:
+        import objc
+        nsview = objc.objc_object(c_void_p=int(w.winId()))
+        nswin = nsview.window()
+        if nswin is not None:
+            nswin.makeKeyAndOrderFront_(None)
+    except Exception as e:
+        print("[livewire] makeKey failed: %r" % e)
+    w.raise_()
+    w.activateWindow()
+    w._edit.setFocus(QtCore.Qt.OtherFocusReason)
+
+
+def show_browser(node_types, source, on_commit, matte_mode=False):
     close_all()
-    w = NodeBrowser(node_types, source, on_commit)
+    w = NodeBrowser(node_types, source, on_commit, matte_mode=matte_mode)
     pos = QtGui.QCursor.pos()
     screen = QtGui.QGuiApplication.screenAt(pos)
     w.adjustSize()
@@ -198,9 +228,8 @@ def show_browser(node_types, source, on_commit):
         y = max(geo.top(), min(y, geo.bottom() - w.height()))
     w.move(x, y)
     w.show()
-    w.raise_()
-    w.activateWindow()
-    w._edit.setFocus()
+    _force_key(w)
+    QtCore.QTimer.singleShot(80, lambda: w.isVisible() and _force_key(w))
     _open.append(w)
     return w
 

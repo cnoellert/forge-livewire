@@ -31,6 +31,7 @@ SETTLE_MS = 140        # let cursor_position settle after release before reading
 _timer = None
 _btn = 0
 _armed = False
+_matte_mode = False    # Shift held at arm time: wire Front AND Matte
 _samples = []          # cursor_position samples during the current drag
 _node_map = []         # [(name, x, y)] snapshotted at press
 _source = None         # {"name":..., "sockets":[...]} once armed
@@ -108,7 +109,25 @@ def _app_active():
         return True
 
 
-def _commit(node_type, out_socket, cp, source):
+def _pick(names, needle):
+    """First name containing needle (case-insensitive), else None."""
+    for n in names:
+        if needle.lower() in n.lower():
+            return n
+    return None
+
+
+def _connect(src, out_sock, new, in_sock):
+    try:
+        if out_sock and in_sock:
+            flame.batch.connect_nodes(src, out_sock, new, in_sock)
+        else:
+            flame.batch.connect_nodes(src, new)
+    except TypeError:
+        flame.batch.connect_nodes(src, new)
+
+
+def _commit(node_type, out_socket, cp, source, matte_mode):
     def do():
         try:
             new = flame.batch.create_node(node_type)
@@ -119,27 +138,34 @@ def _commit(node_type, out_socket, cp, source):
                 pass
             if source and source.get("name"):
                 src = flame.batch.get_node(source["name"])
+                outs = source.get("sockets") or []
                 ins = []
                 try:
                     ins = [str(s) for s in _attr(new.input_sockets)]
                 except Exception:
                     pass
-                in_sock = "Front" if "Front" in ins else (ins[0] if ins else None)
-                try:
-                    if out_socket and in_sock:
-                        flame.batch.connect_nodes(src, out_socket, new, in_sock)
-                    else:
-                        flame.batch.connect_nodes(src, new)
-                except TypeError:
-                    flame.batch.connect_nodes(src, new)
-            print("[livewire] created %s at (%d, %d)"
-                  % (node_type, cp[0], cp[1]))
+                if matte_mode:
+                    front_out = ("Result" if "Result" in outs
+                                 else (outs[0] if outs else None))
+                    matte_out = _pick(outs, "matte") or front_out
+                    front_in = _pick(ins, "front") or (ins[0] if ins else None)
+                    matte_in = _pick(ins, "matte")
+                    _connect(src, front_out, new, front_in)
+                    if matte_in:
+                        _connect(src, matte_out, new, matte_in)
+                else:
+                    in_sock = (_pick(ins, "front")
+                               or (ins[0] if ins else None))
+                    _connect(src, out_socket, new, in_sock)
+            print("[livewire] created %s at (%d, %d)%s"
+                  % (node_type, cp[0], cp[1],
+                     " [front+matte]" if matte_mode else ""))
         except Exception as e:
             print("[livewire] commit failed: %r" % e)
     flame.schedule_idle_event(do)
 
 
-def _fire(release_guess, source):
+def _fire(release_guess, source, matte_mode):
     def show():
         cp = _cpos() or release_guess
         if cp is None:
@@ -147,18 +173,21 @@ def _fire(release_guess, source):
         browser.show_browser(
             node_types=_node_types(),
             source=source,
-            on_commit=lambda ntype, sock: _commit(ntype, sock, cp, source))
+            matte_mode=matte_mode,
+            on_commit=lambda ntype, sock: _commit(ntype, sock, cp, source,
+                                                  matte_mode))
     QtCore.QTimer.singleShot(SETTLE_MS, show)
 
 
 def _tick():
-    global _btn, _armed, _samples, _node_map, _source, err
+    global _btn, _armed, _matte_mode, _samples, _node_map, _source, err
     try:
         st = Quartz.kCGEventSourceStateCombinedSessionState
         btn = 1 if Quartz.CGEventSourceButtonState(st, 0) else 0
         if btn and not _btn:
             _samples = []
             _armed = False
+            _matte_mode = False
             _source = None
             _node_map = _snapshot_nodes() if _app_active() else []
             cp = _cpos()
@@ -171,12 +200,17 @@ def _tick():
             if (not _armed and _node_map
                     and Quartz.CGEventSourceKeyState(st, HOTKEY_VKEY)):
                 _armed = True
+                _matte_mode = bool(
+                    Quartz.CGEventSourceFlagsState(st)
+                    & Quartz.kCGEventFlagMaskShift)
                 _source = _find_source()
-                print("[livewire] armed, source=%s"
-                      % (_source["name"] if _source else None))
+                print("[livewire] armed, source=%s%s"
+                      % (_source["name"] if _source else None,
+                         " [front+matte]" if _matte_mode else ""))
         elif _btn and not btn:
             if _armed:
-                _fire(_samples[-1] if _samples else None, _source)
+                _fire(_samples[-1] if _samples else None, _source,
+                      _matte_mode)
             _armed = False
         _btn = btn
     except Exception as e:
