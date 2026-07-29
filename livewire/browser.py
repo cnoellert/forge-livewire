@@ -7,9 +7,9 @@ commits the highlighted node type, Esc (or clicking elsewhere) cancels.
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-WIDTH = 470
-MAX_ROWS = 15
-ROW_H = 25
+WIDTH = 300
+MAX_ROWS = 14
+ROW_H = 24
 
 _open = []
 
@@ -21,16 +21,14 @@ THEME = "flame"
 
 THEMES = {
     "flame": {
-        "font": '"Artifakt Element"',
-        "panel_bg": "#252525", "panel_border": "#4e4e4e", "radius": "0px",
-        "field_bg": "#0f0f0f", "field_border": "#6e6e6e",
-        "field_focus": "#9a9a9a", "field_fg": "#d6d6d6",
-        "row_fg": "#c8c8c8", "hover": "#313131",
-        "sel_bg": "#56585a", "sel_fg": "#f2f2f2",
+        "panel_bg": "#262626", "panel_border": "#4e4e4e", "radius": "0px",
+        "field_bg": "#131313", "field_border": "#5a5a5a",
+        "field_focus": "#8a8a8a", "field_fg": "#d6d6d6",
+        "row_fg": "#c0c0c0", "hover": "#333333",
+        "sel_bg": "#57595b", "sel_fg": "#f2f2f2",
         "header_fg": "#909090",
     },
     "forge": {
-        "font": '"Discreet"',
         "panel_bg": "#2b2b2b", "panel_border": "#464646", "radius": "2px",
         "field_bg": "#1c1c1c", "field_border": "#3d3d3d",
         "field_focus": "#E87E24", "field_fg": "#d9d9d9",
@@ -45,11 +43,11 @@ _QSS = """
     background: %(panel_bg)s;
     border: 1px solid %(panel_border)s;
     border-radius: %(radius)s;
-    font-family: %(font)s;
+    font-family: "Discreet";
 }
 QLabel#header {
     color: %(header_fg)s;
-    font-family: %(font)s;
+    font-family: "Discreet";
     font-size: 12px;
     padding: 1px 2px 0 2px;
 }
@@ -58,9 +56,9 @@ QLineEdit {
     color: %(field_fg)s;
     border: 1px solid %(field_border)s;
     border-radius: %(radius)s;
-    padding: 6px 8px;
-    font-family: %(font)s;
-    font-size: 14px;
+    padding: 5px 7px;
+    font-family: "Discreet";
+    font-size: 13px;
     selection-background-color: %(sel_bg)s;
     selection-color: %(sel_fg)s;
 }
@@ -70,9 +68,9 @@ QComboBox {
     color: %(row_fg)s;
     border: 1px solid %(field_border)s;
     border-radius: %(radius)s;
-    padding: 3px 8px;
-    font-family: %(font)s;
-    font-size: 13px;
+    padding: 3px 7px;
+    font-family: "Discreet";
+    font-size: 12px;
 }
 QComboBox QAbstractItemView {
     background: %(panel_bg)s;
@@ -84,11 +82,11 @@ QListWidget {
     background: transparent;
     color: %(row_fg)s;
     border: none;
-    font-family: %(font)s;
-    font-size: 14px;
+    font-family: "Discreet";
+    font-size: 13px;
     outline: none;
 }
-QListWidget::item { padding: 4px 10px; }
+QListWidget::item { padding: 3px 7px; border-radius: %(radius)s; }
 QListWidget::item:selected { background: %(sel_bg)s; color: %(sel_fg)s; }
 QListWidget::item:hover { background: %(hover)s; }
 """ % THEMES[THEME]
@@ -128,17 +126,8 @@ class NodeBrowser(QtWidgets.QWidget):
         self._committed = False
 
         lay = QtWidgets.QVBoxLayout(self)
-        lay.setContentsMargins(1, 1, 1, 1)
-        lay.setSpacing(0)
-
-        top = QtWidgets.QWidget(self)
-        tlay = QtWidgets.QVBoxLayout(top)
-        tlay.setContentsMargins(8, 8, 8, 7)
-        tlay.setSpacing(6)
-        lay.addWidget(top)
-
-        def _add(widget):
-            tlay.addWidget(widget)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
 
         if source and source.get("name"):
             header = QtWidgets.QLabel(self)
@@ -146,14 +135,14 @@ class NodeBrowser(QtWidgets.QWidget):
             suffix = u"  ·  front+matte" if matte_mode else u""
             header.setText(u"⤷ from  %s%s" % (source["name"], suffix))
             header.setTextFormat(QtCore.Qt.PlainText)
-            _add(header)
+            lay.addWidget(header)
             sockets = source.get("sockets") or []
             if len(sockets) > 1 and not matte_mode:
                 self._socket_combo = QtWidgets.QComboBox(self)
                 self._socket_combo.addItems(sockets)
                 if "Result" in sockets:
                     self._socket_combo.setCurrentText("Result")
-                _add(self._socket_combo)
+                lay.addWidget(self._socket_combo)
             self._sockets = sockets
         else:
             self._sockets = []
@@ -162,7 +151,7 @@ class NodeBrowser(QtWidgets.QWidget):
         self._edit.setPlaceholderText("Search for...")
         self._edit.textChanged.connect(self._refilter)
         self._edit.installEventFilter(self)
-        _add(self._edit)
+        lay.addWidget(self._edit)
 
         self._list = QtWidgets.QListWidget(self)
         self._list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
