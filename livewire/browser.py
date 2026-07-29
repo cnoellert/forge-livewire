@@ -114,7 +114,8 @@ def _rank(query, name):
 
 class NodeBrowser(QtWidgets.QWidget):
 
-    def __init__(self, node_types, source, on_commit, mode="front"):
+    def __init__(self, node_types, source, on_commit, mode="front",
+                 kind="batch"):
         super().__init__(None, QtCore.Qt.Tool
                          | QtCore.Qt.FramelessWindowHint
                          | QtCore.Qt.WindowStaysOnTopHint)
@@ -135,13 +136,16 @@ class NodeBrowser(QtWidgets.QWidget):
         if source and source.get("name"):
             header = QtWidgets.QLabel(self)
             header.setObjectName("header")
-            suffix = {"matte": u"  (to matte)",
-                      "front_matte": u"  (front+matte)"}.get(mode, u"")
-            header.setText(u"from  %s%s" % (source["name"], suffix))
+            if kind == "action":
+                header.setText(u"parent  %s" % source["name"])
+            else:
+                suffix = {"matte": u"  (to matte)",
+                          "front_matte": u"  (front+matte)"}.get(mode, u"")
+                header.setText(u"from  %s%s" % (source["name"], suffix))
             header.setTextFormat(QtCore.Qt.PlainText)
             lay.addWidget(header)
             sockets = source.get("sockets") or []
-            if len(sockets) > 1 and mode != "front_matte":
+            if len(sockets) > 1 and kind != "action" and mode != "front_matte":
                 self._socket_combo = QtWidgets.QComboBox(self)
                 self._socket_combo.addItems(sockets)
                 default = None
@@ -259,9 +263,9 @@ def _force_key(w):
     w._edit.setFocus(QtCore.Qt.OtherFocusReason)
 
 
-def show_browser(node_types, source, on_commit, mode="front"):
+def show_browser(node_types, source, on_commit, mode="front", kind="batch"):
     close_all()
-    w = NodeBrowser(node_types, source, on_commit, mode=mode)
+    w = NodeBrowser(node_types, source, on_commit, mode=mode, kind=kind)
     pos = QtGui.QCursor.pos()
     screen = QtGui.QGuiApplication.screenAt(pos)
     w.adjustSize()
