@@ -25,9 +25,14 @@ design.
 
 - `Quartz.CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, 0)`
   polled on a 30 ms main-thread `QTimer` gives clean press/release edges.
-  PyObjC (`objc`, `Quartz`, `AppKit`) ships inside Flame's Python.
   No permissions required. Captures clicks globally (including other
   monitors — bound checks needed).
+- **Correction (2026-07-29):** PyObjC does *not* ship inside Flame's
+  Python. It imported during the original probe session only because the
+  launch environment happened to path it in; a clean Flame start has no
+  `objc`/`Quartz`/`AppKit`. Livewire vendors PyObjC via
+  `pip install --target vendor/` with Flame's own interpreter (see
+  README), and the package inserts `vendor/` on import.
 - `QTimer` on the main thread runs fine (installed via
   `schedule_idle_event`).
 
