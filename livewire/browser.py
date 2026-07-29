@@ -13,50 +13,63 @@ ROW_H = 24
 
 _open = []
 
+# Flame-native body (neutral charcoal, Discreet font, dense rows) with a
+# single forge signature: the E87E24 orange accent on selection and focus.
+ACCENT = "#E87E24"
+ACCENT_HI = "#f59035"
+
 _QSS = """
 #livewirePanel {
-    background: #242424;
-    border: 1px solid #4a4a4a;
-    border-radius: 4px;
+    background: #2b2b2b;
+    border: 1px solid #464646;
+    border-radius: 3px;
+    font-family: "Discreet";
 }
 QLabel#header {
-    color: #8f8f8f;
-    font-size: 11px;
-    padding: 2px 2px 0 2px;
+    color: %(accent)s;
+    font-family: "Discreet";
+    font-size: 12px;
+    padding: 1px 2px 0 2px;
 }
 QLineEdit {
-    background: #171717;
-    color: #e6e6e6;
+    background: #1c1c1c;
+    color: #d9d9d9;
     border: 1px solid #3d3d3d;
-    border-radius: 3px;
-    padding: 6px 8px;
+    border-radius: 2px;
+    padding: 5px 7px;
+    font-family: "Discreet";
     font-size: 13px;
-    selection-background-color: #3d5a73;
+    selection-background-color: %(accent)s;
+    selection-color: #141414;
 }
-QLineEdit:focus { border-color: #5a7d99; }
+QLineEdit:focus { border-color: %(accent)s; }
 QComboBox {
-    background: #171717;
-    color: #cfcfcf;
+    background: #1c1c1c;
+    color: #c4c4c4;
     border: 1px solid #3d3d3d;
-    border-radius: 3px;
-    padding: 3px 8px;
+    border-radius: 2px;
+    padding: 3px 7px;
+    font-family: "Discreet";
     font-size: 12px;
 }
 QComboBox QAbstractItemView {
-    background: #1e1e1e;
-    color: #cfcfcf;
-    selection-background-color: #3d5a73;
+    background: #222222;
+    color: #c4c4c4;
+    selection-background-color: %(accent)s;
+    selection-color: #141414;
 }
 QListWidget {
     background: transparent;
-    color: #c9c9c9;
+    color: #b8b8b8;
     border: none;
+    font-family: "Discreet";
     font-size: 13px;
     outline: none;
 }
-QListWidget::item { padding: 3px 8px; border-radius: 3px; }
-QListWidget::item:selected { background: #3d5a73; color: #ffffff; }
-"""
+QListWidget::item { padding: 3px 7px; border-radius: 2px; }
+QListWidget::item:selected { background: %(accent)s; color: #141414; }
+QListWidget::item:hover { background: #383838; }
+""" % {"accent": ACCENT}
 
 
 def _rank(query, name):
