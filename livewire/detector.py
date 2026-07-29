@@ -21,9 +21,12 @@ except Exception:
 
 from . import browser
 
-# macOS virtual keycodes: backtick/grave=50, Tab=48 (conflicts: Flame tabs
-# the schematic between node types), section-sign=10 on ISO keyboards.
-HOTKEY_VKEY = 50
+# Arm keys, polled only while a drag is in flight. Tapping F routes the
+# connection into the new node's Front input, M into its Matte; tapping
+# both during one drag wires front+matte. (Tab and backtick are taken:
+# Tab tabs the schematic, backtick is assigned in Action.)
+KEY_FRONT = 3    # macOS vkey: F
+KEY_MATTE = 46   # macOS vkey: M
 TICK_MS = 30
 GRAB_RADIUS = 150.0    # schematic units: max grab-point distance to a node anchor
 EARLY_SAMPLES = 6      # drag samples considered part of the grab point
@@ -32,7 +35,8 @@ SETTLE_MS = 140        # let cursor_position settle after release before reading
 _timer = None
 _btn = 0
 _armed = False
-_matte_mode = False    # Shift held at arm time: wire Front AND Matte
+_to_front = False      # F tapped during the drag
+_to_matte = False      # M tapped during the drag
 _samples = []          # cursor_position samples during the current drag
 _node_map = []         # [(name, x, y)] snapshotted at press
 _source = None         # {"name":..., "sockets":[...]} once armed
@@ -128,7 +132,7 @@ def _connect(src, out_sock, new, in_sock):
         flame.batch.connect_nodes(src, new)
 
 
-def _commit(node_type, out_socket, cp, source, matte_mode):
+def _commit(node_type, out_socket, cp, source, mode):
     def do():
         try:
             new = flame.batch.create_node(node_type)
@@ -145,7 +149,7 @@ def _commit(node_type, out_socket, cp, source, matte_mode):
                     ins = [str(s) for s in _attr(new.input_sockets)]
                 except Exception:
                     pass
-                if matte_mode:
+                if mode == "front_matte":
                     front_out = ("Result" if "Result" in outs
                                  else (outs[0] if outs else None))
                     matte_out = _pick(outs, "matte") or front_out
@@ -155,18 +159,18 @@ def _commit(node_type, out_socket, cp, source, matte_mode):
                     if matte_in:
                         _connect(src, matte_out, new, matte_in)
                 else:
-                    in_sock = (_pick(ins, "front")
+                    needle = "matte" if mode == "matte" else "front"
+                    in_sock = (_pick(ins, needle)
                                or (ins[0] if ins else None))
                     _connect(src, out_socket, new, in_sock)
-            print("[livewire] created %s at (%d, %d)%s"
-                  % (node_type, cp[0], cp[1],
-                     " [front+matte]" if matte_mode else ""))
+            print("[livewire] created %s at (%d, %d) [%s]"
+                  % (node_type, cp[0], cp[1], mode))
         except Exception as e:
             print("[livewire] commit failed: %r" % e)
     flame.schedule_idle_event(do)
 
 
-def _fire(release_guess, source, matte_mode):
+def _fire(release_guess, source, mode):
     def show():
         cp = _cpos() or release_guess
         if cp is None:
@@ -174,21 +178,23 @@ def _fire(release_guess, source, matte_mode):
         browser.show_browser(
             node_types=_node_types(),
             source=source,
-            matte_mode=matte_mode,
+            mode=mode,
             on_commit=lambda ntype, sock: _commit(ntype, sock, cp, source,
-                                                  matte_mode))
+                                                  mode))
     QtCore.QTimer.singleShot(SETTLE_MS, show)
 
 
 def _tick():
-    global _btn, _armed, _matte_mode, _samples, _node_map, _source, err
+    global _btn, _armed, _to_front, _to_matte
+    global _samples, _node_map, _source, err
     try:
         st = Quartz.kCGEventSourceStateCombinedSessionState
         btn = 1 if Quartz.CGEventSourceButtonState(st, 0) else 0
         if btn and not _btn:
             _samples = []
             _armed = False
-            _matte_mode = False
+            _to_front = False
+            _to_matte = False
             _source = None
             _node_map = _snapshot_nodes() if _app_active() else []
             cp = _cpos()
@@ -198,20 +204,26 @@ def _tick():
             cp = _cpos()
             if cp and (not _samples or cp != _samples[-1]):
                 _samples.append(cp)
-            if (not _armed and _node_map
-                    and Quartz.CGEventSourceKeyState(st, HOTKEY_VKEY)):
-                _armed = True
-                _matte_mode = bool(
-                    Quartz.CGEventSourceFlagsState(st)
-                    & Quartz.kCGEventFlagMaskShift)
-                _source = _find_source()
-                print("[livewire] armed, source=%s%s"
-                      % (_source["name"] if _source else None,
-                         " [front+matte]" if _matte_mode else ""))
+            if _node_map:
+                f_down = Quartz.CGEventSourceKeyState(st, KEY_FRONT)
+                m_down = Quartz.CGEventSourceKeyState(st, KEY_MATTE)
+                if f_down or m_down:
+                    if not _armed:
+                        _armed = True
+                        _source = _find_source()
+                        print("[livewire] armed, source=%s"
+                              % (_source["name"] if _source else None))
+                    _to_front = _to_front or bool(f_down)
+                    _to_matte = _to_matte or bool(m_down)
         elif _btn and not btn:
             if _armed:
-                _fire(_samples[-1] if _samples else None, _source,
-                      _matte_mode)
+                if _to_front and _to_matte:
+                    mode = "front_matte"
+                elif _to_matte:
+                    mode = "matte"
+                else:
+                    mode = "front"
+                _fire(_samples[-1] if _samples else None, _source, mode)
             _armed = False
         _btn = btn
     except Exception as e:

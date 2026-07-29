@@ -114,7 +114,7 @@ def _rank(query, name):
 
 class NodeBrowser(QtWidgets.QWidget):
 
-    def __init__(self, node_types, source, on_commit, matte_mode=False):
+    def __init__(self, node_types, source, on_commit, mode="front"):
         super().__init__(None, QtCore.Qt.Tool
                          | QtCore.Qt.FramelessWindowHint
                          | QtCore.Qt.WindowStaysOnTopHint)
@@ -135,16 +135,23 @@ class NodeBrowser(QtWidgets.QWidget):
         if source and source.get("name"):
             header = QtWidgets.QLabel(self)
             header.setObjectName("header")
-            suffix = u"  (front+matte)" if matte_mode else u""
+            suffix = {"matte": u"  (to matte)",
+                      "front_matte": u"  (front+matte)"}.get(mode, u"")
             header.setText(u"from  %s%s" % (source["name"], suffix))
             header.setTextFormat(QtCore.Qt.PlainText)
             lay.addWidget(header)
             sockets = source.get("sockets") or []
-            if len(sockets) > 1 and not matte_mode:
+            if len(sockets) > 1 and mode != "front_matte":
                 self._socket_combo = QtWidgets.QComboBox(self)
                 self._socket_combo.addItems(sockets)
-                if "Result" in sockets:
-                    self._socket_combo.setCurrentText("Result")
+                default = None
+                if mode == "matte":
+                    default = next((s for s in sockets
+                                    if "matte" in s.lower()), None)
+                if default is None and "Result" in sockets:
+                    default = "Result"
+                if default:
+                    self._socket_combo.setCurrentText(default)
                 lay.addWidget(self._socket_combo)
             self._sockets = sockets
         else:
@@ -252,9 +259,9 @@ def _force_key(w):
     w._edit.setFocus(QtCore.Qt.OtherFocusReason)
 
 
-def show_browser(node_types, source, on_commit, matte_mode=False):
+def show_browser(node_types, source, on_commit, mode="front"):
     close_all()
-    w = NodeBrowser(node_types, source, on_commit, matte_mode=matte_mode)
+    w = NodeBrowser(node_types, source, on_commit, mode=mode)
     pos = QtGui.QCursor.pos()
     screen = QtGui.QGuiApplication.screenAt(pos)
     w.adjustSize()
