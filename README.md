@@ -89,6 +89,17 @@ feeds the connection (defaults to `Result`).
 F and M are only watched **while a connection drag is in flight** — they
 keep their normal Flame meanings the rest of the time.
 
+## The index
+
+The browser lists far more than the built-in node types: stock Matchbox
+shaders (`Blur - Matchbox`, created with the shader loaded), your user
+bins (`Lens_Blur - User`, appended and wired at the drop point), and
+OpenFX plugins (`Reduce Noise v6 - OpenFX`, created with the plugin
+selected). Ranking comes from Flame's own search data — favorites
+first, then your most-used tools — so an empty search box already
+shows what you reach for daily. After installing new shaders or saving
+new bins mid-session, run `livewire.reindex()` (or restart Flame).
+
 ## What it does *not* do (yet)
 
 - **It can't tell which output socket you grabbed.** Pulling the matte
@@ -96,11 +107,10 @@ keep their normal Flame meanings the rest of the time.
   source socket is `Result`/first unless you change the menu (or use
   **M**, which guesses the matte output). Socket inference from the grab
   position is feasible (see docs/FINDINGS.md) and planned.
-- **The list is Flame's built-in node types only** (the 99 entries of
-  `flame.batch.node_types`). User Matchbox setups, OFX plugins, and
-  saved presets are not indexed yet — you get a bare `Matchbox`/`OpenFX`
-  node, not `Lens_Blur - User`. Planned.
-- No favorites/recents ordering yet.
+- **OFX coverage is harvested, not enumerated** — plugins you've used
+  (or that appear in a Nuke OFX cache on the machine) are listed;
+  a never-used plugin won't be until it's used once. Stale labels from
+  renamed plugins can appear and silently create an empty OpenFX node.
 
 ## Configuration
 

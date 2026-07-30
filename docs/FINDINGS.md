@@ -91,6 +91,33 @@ Live cursor position in **schematic space**, same coordinate system as
   callable` (a confusing signature worth remembering). Use the global
   `flame.delete(node)` instead.
 
+## Indexing sources (probed 2026-07-29)
+
+- **`~/Library/Preferences/Autodesk/flame/search/search_settings.json`**
+  is the native search popup's database: per-entry `Name`, `Weight`
+  (usage count — their ranking), `Tags` (search synonyms), `Favorite`,
+  and `Type` (`Matchbox` / `OpenFX` / `User` / `Timeline FX` / …). It is
+  a *usage* DB, not a catalog — only tools the artist has touched get
+  typed entries. Gold for ranking parity and OFX label harvesting.
+- **Stock Matchbox shaders**: `/opt/Autodesk/presets/<ver>/matchbox/
+  shaders/*.mx` (compiled, no XML sidecars — name is the filename stem).
+  `flame.batch.create_node("Matchbox", shader_path)` creates the node
+  with the shader loaded, one call.
+- **User bins**: `~/Library/Preferences/Autodesk/flame/batch/pref/
+  _user.<Name>.batch` (+ companion resource dir). Instantiate with
+  `flame.batch.append_setup(path)` — **which can raise "Could not load
+  the Batch setup" AFTER successfully appending the nodes** (seen with
+  2026.1-saved bins in 2026.2.2). Tolerate the exception and diff the
+  node list for the truth.
+- **OpenFX**: `create_node("OpenFX")` + `node.change_plugin(label)`.
+  Labels only — the display label as shown in `node.plugin_name`
+  ("ForgeFlow Apply", not the bundle name or the reverse-domain id);
+  unknown labels silently no-op. No Flame-side OFX registry exists on
+  disk; label sources: search_settings.json typed entries, Nuke's OFX
+  plugin cache (`/var/tmp/nuke-*/ofxplugincache/*.xml`, carries
+  `OfxPropLabel` for every installed plugin), and `plugin_name` of
+  existing OpenFX nodes.
+
 ## Gesture classification plan
 
 - Socket grab: early-drag `cursor_position` near a node anchor with the

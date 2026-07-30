@@ -16,19 +16,18 @@ Remaining Action follow-ups: creatable media nodes (`add_media`), other
 schematic-bearing nodes (GMask Tracer), and a parent-vs-sibling choice
 on the mode keys if artists want it.
 
-## 2. Matchbox / OFX / user-bin indexing
+## 2. Matchbox / OFX / user-bin indexing — ✅ shipped 2026-07-29
 
-Flame's native search lists `Lens_Blur - User` and `ColourCorrect -
-Matchbox`; livewire lists only the 99 `flame.batch.node_types`. Index:
-- Matchbox shaders: scan the shader dirs (`/opt/Autodesk/presets/<ver>/
-  matchbox/shaders`, project/user matchbox paths); names + shader path
-  from the XML sidecars. Commit = create `Matchbox` node + load shader
-  (`node.load_node_setup()` / matchbox path attribute — verify API).
-- OFX: enumerate installed OFX plugins (verify what the python API
-  exposes; worst case parse the OFX cache).
-- User node setups/presets: user's node bin saves.
-Entries get a suffix tag like the native browser. Index at install,
-refresh lazily.
+262 entries on the dev box: node types + stock Matchbox scan + user
+bins (`append_setup`, tolerating its throw-after-append quirk) + OFX
+labels harvested from search_settings.json / Nuke's plugin cache / live
+batch nodes. Ranking uses Flame's own Weight/Favorite, so an empty
+query surfaces the artist's most-used tools. See FINDINGS "Indexing
+sources". Follow-ups: stale harvested OFX labels silently no-op
+(`change_plugin` gives no error — validate against plugin_name after
+commit and warn); `EXTRA_MATCHBOX_DIRS` config for Logik collections
+(belongs in the item-8 config file); auto-reindex on a timer or hook
+instead of manual `livewire.reindex()`.
 
 ## 3. Action input capture → auto-wire into maps (BIG)
 
