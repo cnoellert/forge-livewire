@@ -185,7 +185,13 @@ def _instantiate_batch(entry, cp):
                 before.add(str(_attr(n.name)))
             except Exception:
                 pass
-        flame.batch.append_setup(entry["payload"])
+        try:
+            flame.batch.append_setup(entry["payload"])
+        except Exception as e:
+            # append_setup can raise (e.g. setup saved by an older Flame)
+            # AFTER having appended the nodes — the diff below is the real
+            # success test, so treat the exception as advisory only.
+            _log("append_setup complained (tolerated): %r" % e)
         added = [n for n in _attr(flame.batch.nodes)
                  if str(_attr(n.name)) not in before]
         if not added:
