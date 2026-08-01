@@ -63,6 +63,8 @@ livewire.install()
    | **F** | source output → new node's **Front** (or its first input) |
    | **M** | source output → new node's **Matte** input; the source-socket menu pre-selects the source's matte output (e.g. `OutMatte`) if it has one |
    | **F then M** (both, same drag) | source's image output (`Result`, or first) → **Front** *and* source's matte output → **Matte** |
+   | **G** | **gang (chain) mode** — the browser stays open; every Enter commits a node immediately, chained `Result` → `Front` off the previous one, marching right. Esc or click-away ends the gang |
+   | **G then M** | gang with **front+matte** wiring on every link |
 
 3. **Release over empty schematic space.** The noodle cancels natively and
    the search popup appears at the drop point.
@@ -82,9 +84,12 @@ detects per-drag which schematic is active; no mode switching. Media
 nodes can be grab sources but are not creatable from the browser yet.
 
 The header line shows what you're about to do — e.g.
-`from cc1 (to matte)`. If the source node has more than one output
-socket, a menu above the search field lets you override which output
-feeds the connection (defaults to `Result`).
+`from cc1 (to matte)`, or the growing trail in a gang
+(`gang cc1 > Blur > Colour Correct`). If the source node has more than
+one output socket, a menu above the search field lets you override
+which output feeds the connection (defaults to `Result`; in a gang it
+applies to the first link only). Everything a gang commits is already
+in the schematic — ending it changes nothing, and regret is Ctrl+Z.
 
 F and M are only watched **while a connection drag is in flight** — they
 keep their normal Flame meanings the rest of the time.

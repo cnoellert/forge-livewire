@@ -118,6 +118,20 @@ Live cursor position in **schematic space**, same coordinate system as
   `OfxPropLabel` for every installed plugin), and `plugin_name` of
   existing OpenFX nodes.
 
+## Threading and API lessons (2026-07-29)
+
+- **Batch `connect_nodes` is strictly 4-arg** (`src, out_socket, dst,
+  in_socket`); the 2-arg parent/child shorthand exists only on Action.
+  Boost's ArgumentError subclasses TypeError, so a naive try/except
+  TypeError fallback retries the same broken call.
+- **`flame.schedule_idle_event` drains only when Flame's own UI sees
+  activity.** Work queued from a focused Qt popup sits until the user
+  next touches Flame (e.g. clicks the schematic). Callbacks that already
+  run on the main thread (dialog handlers) should call the flame API
+  directly; reserve idle marshaling for bridge/worker-thread entry.
+- `detector._debug` is a 200-entry timestamped ring buffer of livewire
+  events — first stop when behavior looks timing-dependent.
+
 ## Gesture classification plan
 
 - Socket grab: early-drag `cursor_position` near a node anchor with the

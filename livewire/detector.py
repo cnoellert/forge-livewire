@@ -69,7 +69,13 @@ _act_types_cache = None
 err = None
 
 
+_debug = []      # (timestamp, msg) ring buffer, kept even when quiet
+
+
 def _log(msg):
+    import time
+    _debug.append((round(time.time() % 100000, 3), msg))
+    del _debug[:-200]
     if VERBOSE:
         print("[livewire] %s" % msg)
 
@@ -295,8 +301,11 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
         state = {"source": source, "cp": cp, "first": True}
 
         def on_commit(entry, sock):
+            _log("on_commit called: %s (mode=%s)" % (entry["display"], mode))
+
             def do():
                 try:
+                    _log("do() begin: %s" % entry["display"])
                     use_sock = sock if state["first"] else None
                     if is_action:
                         new = _commit_action(entry, state["cp"],
@@ -311,6 +320,7 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
                         except Exception:
                             outs = []
                     name = str(_attr(new.name))
+                    _log("do() created+wired: %s" % name)
                     dx = CHAIN_DX_ACTION if is_action else CHAIN_DX_BATCH
                     state["source"] = {"name": name, "sockets": outs}
                     state["cp"] = (float(_attr(new.pos_x)) + dx,
