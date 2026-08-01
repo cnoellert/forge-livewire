@@ -167,14 +167,15 @@ def _app_active():
         return True
 
 
-def _nudge_flame():
+def _nudge_flame(nsloc=None):
     """Wake Flame's redraw after a commit made while the popup holds
     focus. Flame repaints when processing its own input events (classic
     redraw-after-input), so: pump Qt's dispatcher (input excluded), then
-    post a synthetic no-op mouse-move addressed to Flame's main window —
-    the closest in-process imitation of the schematic click that is
-    known to trigger the repaint. (A bare NSApplicationDefined post was
-    not enough — tried and falsified.)"""
+    post a synthetic no-op mouse-move addressed to Flame's main window.
+    Aim it at nsloc — the drop point in bottom-left screen coords, i.e.
+    inside the schematic panel being used — since a center-of-window
+    move wakes the Batch panel but can miss Action's. (A bare
+    NSApplicationDefined post was not enough — tried and falsified.)"""
     try:
         from PySide6 import QtCore
         QtCore.QCoreApplication.sendPostedEvents()
@@ -198,7 +199,11 @@ def _nudge_flame():
             mtype = getattr(AppKit, "NSEventTypeMouseMoved",
                             getattr(AppKit, "NSMouseMoved", 5))
             f = main.frame()
-            loc = (f.size.width / 2.0, f.size.height / 2.0)
+            if nsloc is not None:
+                loc = (nsloc[0] - float(f.origin.x),
+                       nsloc[1] - float(f.origin.y))
+            else:
+                loc = (f.size.width / 2.0, f.size.height / 2.0)
             ev = (AppKit.NSEvent.
                   mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure_(
                       mtype, loc, 0, 0.0, main.windowNumber(), None,
@@ -385,7 +390,13 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
             return
 
         # Mutable across a gang: each pick chains from the previous one.
-        state = {"source": source, "cp": cp, "first": True}
+        state = {"source": source, "cp": cp, "first": True, "nsloc": None}
+        try:
+            import AppKit
+            p = AppKit.NSEvent.mouseLocation()  # cursor is at the drop
+            state["nsloc"] = (float(p.x), float(p.y))  # point right now
+        except Exception:
+            pass
 
         def on_commit(entry, sock):
             _log("on_commit called: %s (mode=%s)" % (entry["display"], mode))
@@ -427,7 +438,7 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
             # directly — schedule_idle_event would sit in Flame's idle
             # queue until the user next touches Flame's own UI.
             do()
-            _nudge_flame()
+            _nudge_flame(state.get("nsloc"))
 
         browser.show_browser(
             entries=entries,
