@@ -40,7 +40,8 @@ from . import indexer
 KEY_FRONT = 3    # macOS vkey: F
 KEY_MATTE = 46   # macOS vkey: M
 KEY_GANG = 5     # macOS vkey: G
-KEY_CHAINSEL = 8  # macOS vkey: C — replicate picks across the selection
+KEY_CHAINSEL = 15  # macOS vkey: R — replicate picks across the selection
+                   # (C is taken: compass in the Batch schematic)
 
 CHAIN_DX_BATCH = 200   # batch chains march right
 CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
