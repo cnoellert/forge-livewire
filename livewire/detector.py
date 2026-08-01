@@ -42,8 +42,9 @@ KEY_MATTE = 46   # macOS vkey: M
 KEY_GANG = 5     # macOS vkey: G
 KEY_CHAINSEL = 15  # macOS vkey: R — replicate picks across the selection
                    # (C is taken: compass in the Batch schematic)
-KEY_INGEST = 0     # macOS vkey: A — grab an Action, tap A: scan its
+KEY_INGEST = 34    # macOS vkey: I — grab an Action, tap I: scan its
                    # media inputs and open the map-ingest table
+                   # (A is taken: adds knots to node outputs mid-drag)
 
 CHAIN_DX_BATCH = 200   # batch chains march right
 CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
