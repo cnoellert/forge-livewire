@@ -124,7 +124,7 @@ def _rank(query, entry):
 class NodeBrowser(QtWidgets.QWidget):
 
     def __init__(self, entries, source, on_commit, mode="front",
-                 kind="batch"):
+                 kind="batch", chain=False):
         super().__init__(None, QtCore.Qt.Tool
                          | QtCore.Qt.FramelessWindowHint
                          | QtCore.Qt.WindowStaysOnTopHint)
@@ -137,22 +137,24 @@ class NodeBrowser(QtWidgets.QWidget):
         self._on_commit = on_commit
         self._socket_combo = None
         self._committed = False
+        self._chain = chain
+        self._trail = [source["name"]] if (source and source.get("name")) \
+            else []
+        self._header = None
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(6)
 
+        self._kind = kind
+        self._mode = mode
+        if chain or (source and source.get("name")):
+            self._header = QtWidgets.QLabel(self)
+            self._header.setObjectName("header")
+            self._header.setTextFormat(QtCore.Qt.PlainText)
+            self._update_header()
+            lay.addWidget(self._header)
         if source and source.get("name"):
-            header = QtWidgets.QLabel(self)
-            header.setObjectName("header")
-            if kind == "action":
-                header.setText(u"parent  %s" % source["name"])
-            else:
-                suffix = {"matte": u"  (to matte)",
-                          "front_matte": u"  (front+matte)"}.get(mode, u"")
-                header.setText(u"from  %s%s" % (source["name"], suffix))
-            header.setTextFormat(QtCore.Qt.PlainText)
-            lay.addWidget(header)
             sockets = source.get("sockets") or []
             if len(sockets) > 1 and kind != "action" and mode != "front_matte":
                 self._socket_combo = QtWidgets.QComboBox(self)
@@ -184,6 +186,21 @@ class NodeBrowser(QtWidgets.QWidget):
         lay.addWidget(self._list)
 
         self._refilter("")
+
+    # -- header ------------------------------------------------------------
+
+    def _update_header(self):
+        if self._header is None:
+            return
+        if self._chain:
+            trail = "  >  ".join(self._trail) if self._trail else "(new)"
+            self._header.setText(u"gang  %s" % trail)
+        elif self._kind == "action":
+            self._header.setText(u"parent  %s" % self._trail[0])
+        else:
+            suffix = {"matte": u"  (to matte)",
+                      "front_matte": u"  (front+matte)"}.get(self._mode, u"")
+            self._header.setText(u"from  %s%s" % (self._trail[0], suffix))
 
     # -- filtering ---------------------------------------------------------
 
@@ -237,9 +254,18 @@ class NodeBrowser(QtWidgets.QWidget):
         item = self._list.currentItem()
         if item is None:
             return
-        self._committed = True
         entry = item.data(QtCore.Qt.UserRole)
         socket = self._current_socket()
+        if self._chain:
+            # gang mode: commit and stay open for the next pick
+            self._on_commit(entry, socket)
+            self._trail.append(entry["label"])
+            self._update_header()
+            self._edit.clear()
+            self._edit.setFocus(QtCore.Qt.OtherFocusReason)
+            self.adjustSize()
+            return
+        self._committed = True
         self.close()
         self._on_commit(entry, socket)
 
@@ -274,9 +300,11 @@ def _force_key(w):
     w._edit.setFocus(QtCore.Qt.OtherFocusReason)
 
 
-def show_browser(entries, source, on_commit, mode="front", kind="batch"):
+def show_browser(entries, source, on_commit, mode="front", kind="batch",
+                 chain=False):
     close_all()
-    w = NodeBrowser(entries, source, on_commit, mode=mode, kind=kind)
+    w = NodeBrowser(entries, source, on_commit, mode=mode, kind=kind,
+                    chain=chain)
     pos = QtGui.QCursor.pos()
     screen = QtGui.QGuiApplication.screenAt(pos)
     w.adjustSize()

@@ -31,11 +31,18 @@ from . import indexer
 
 # Arm keys, polled only while a drag is in flight. In Batch, F routes the
 # connection into the new node's Front input, M into its Matte, both =
-# front+matte. In an Action schematic either key arms; the new node is
-# linked as a child of the grabbed node. (Tab and backtick are taken:
-# Tab tabs the schematic, backtick is assigned in Action.)
+# front+matte. G arms gang (chain) mode: the browser stays open and each
+# pick chains from the previous one until Esc / click-away; G+M gangs
+# with the matte flavors per link. In an Action schematic any arm key
+# works; the new node(s) are linked as children (a gang = parent chain).
+# (Tab and backtick are taken: Tab tabs the schematic, backtick is
+# assigned in Action.)
 KEY_FRONT = 3    # macOS vkey: F
 KEY_MATTE = 46   # macOS vkey: M
+KEY_GANG = 5     # macOS vkey: G
+
+CHAIN_DX_BATCH = 200   # schematic-units step between chained nodes
+CHAIN_DX_ACTION = 130
 
 VERBOSE = False  # arm/commit chatter in the shell; errors always print
 
@@ -49,6 +56,7 @@ _btn = 0
 _armed = False
 _to_front = False
 _to_matte = False
+_gang = False          # G tapped during the drag: chain mode
 _pairs = []            # [(batch_cpos, action_cpos|None), ...] this drag
 _bat_map = []          # [(name, x, y)] batch nodes, snapshotted at press
 _act_map = []          # [(name, x, y)] open action's nodes
@@ -171,7 +179,12 @@ def _connect(src, out_sock, new, in_sock):
 
 
 def _instantiate_batch(entry, cp):
-    """Create the picked entry in Batch at cp; return the head node."""
+    """Create the picked entry in Batch at cp.
+
+    Returns (in_node, out_node): the node to connect the source into and
+    the node a chain continues from. Identical except for multi-node
+    user bins (leftmost in, rightmost out).
+    """
     kind = entry.get("kind", "node")
     if kind == "matchbox":
         new = flame.batch.create_node("Matchbox", entry["payload"])
@@ -203,7 +216,8 @@ def _instantiate_batch(entry, cp):
         for n in added:
             n.pos_x = int(float(_attr(n.pos_x)) + dx)
             n.pos_y = int(float(_attr(n.pos_y)) + dy)
-        return min(added, key=lambda n: float(_attr(n.pos_x)))
+        return (min(added, key=lambda n: float(_attr(n.pos_x))),
+                max(added, key=lambda n: float(_attr(n.pos_x))))
     else:
         new = flame.batch.create_node(entry["payload"])
     try:
@@ -211,11 +225,12 @@ def _instantiate_batch(entry, cp):
         new.pos_y = int(cp[1])
     except Exception:
         pass
-    return new
+    return new, new
 
 
 def _commit_batch(entry, out_socket, cp, source, mode):
-    new = _instantiate_batch(entry, cp)
+    """Create + wire one pick; returns the chain-out node."""
+    new, out_node = _instantiate_batch(entry, cp)
     if source and source.get("name"):
         src = flame.batch.get_node(source["name"])
         outs = source.get("sockets") or []
@@ -237,9 +252,11 @@ def _commit_batch(entry, out_socket, cp, source, mode):
             needle = "matte" if mode == "matte" else "front"
             in_sock = _pick(ins, needle) or (ins[0] if ins else None)
             _connect(src, out_socket, new, in_sock)
+    return out_node
 
 
 def _commit_action(entry, cp, source, action_name):
+    """Create + link one pick inside the Action; returns the new node."""
     a = flame.batch.get_node(action_name)
     new = a.create_node(entry["payload"])
     try:
@@ -251,26 +268,13 @@ def _commit_action(entry, cp, source, action_name):
         src = a.get_node(source["name"])
         if src is not None:
             a.connect_nodes(src, new)
+    return new
 
 
-def _commit(entry, out_socket, cp, source, mode, surface):
-    def do():
-        try:
-            if surface and surface.get("kind") == "action":
-                _commit_action(entry, cp, source, surface["action"])
-            else:
-                _commit_batch(entry, out_socket, cp, source, mode)
-            _log("created %s at (%d, %d) [%s/%s]"
-                 % (entry["display"], cp[0], cp[1],
-                    (surface or {}).get("kind", "batch"), mode))
-        except Exception as e:
-            print("[livewire] commit failed: %r" % e)
-    flame.schedule_idle_event(do)
-
-
-def _fire(release_guess, source, mode, surface, act_obj):
+def _fire(release_guess, source, mode, surface, act_obj, gang):
     def show():
-        if surface and surface.get("kind") == "action":
+        is_action = bool(surface and surface.get("kind") == "action")
+        if is_action:
             cp = _cpos_of(act_obj) if act_obj is not None else None
             entries = [{"display": t, "label": t, "kind": "action_node",
                         "payload": t, "fav": False, "weight": 0}
@@ -282,13 +286,46 @@ def _fire(release_guess, source, mode, surface, act_obj):
         cp = cp or release_guess
         if cp is None:
             return
+
+        # Mutable across a gang: each pick chains from the previous one.
+        state = {"source": source, "cp": cp, "first": True}
+
+        def on_commit(entry, sock):
+            def do():
+                try:
+                    use_sock = sock if state["first"] else None
+                    if is_action:
+                        new = _commit_action(entry, state["cp"],
+                                             state["source"],
+                                             surface["action"])
+                        outs = []
+                    else:
+                        new = _commit_batch(entry, use_sock, state["cp"],
+                                            state["source"], mode)
+                        try:
+                            outs = [str(s) for s in _attr(new.output_sockets)]
+                        except Exception:
+                            outs = []
+                    name = str(_attr(new.name))
+                    dx = CHAIN_DX_ACTION if is_action else CHAIN_DX_BATCH
+                    state["source"] = {"name": name, "sockets": outs}
+                    state["cp"] = (float(_attr(new.pos_x)) + dx,
+                                   float(_attr(new.pos_y)))
+                    state["first"] = False
+                    _log("created %s [%s/%s]"
+                         % (entry["display"],
+                            "action" if is_action else "batch", mode))
+                except Exception as e:
+                    print("[livewire] commit failed: %r" % e)
+            flame.schedule_idle_event(do)
+
         browser.show_browser(
             entries=entries,
             source=source,
             mode=mode,
             kind=(surface or {}).get("kind", "batch"),
-            on_commit=lambda entry, sock: _commit(entry, sock, cp, source,
-                                                  mode, surface))
+            chain=gang,
+            on_commit=on_commit)
     QtCore.QTimer.singleShot(SETTLE_MS, show)
 
 
@@ -315,7 +352,7 @@ def _decide_surface():
 
 
 def _tick():
-    global _btn, _armed, _to_front, _to_matte, _pairs
+    global _btn, _armed, _to_front, _to_matte, _gang, _pairs
     global _bat_map, _act_map, _act_name, _act_obj, _surface, _source, err
     try:
         st = Quartz.kCGEventSourceStateCombinedSessionState
@@ -325,6 +362,7 @@ def _tick():
             _armed = False
             _to_front = False
             _to_matte = False
+            _gang = False
             _source = None
             _surface = None
             if _app_active():
@@ -349,7 +387,8 @@ def _tick():
             if _bat_map or _act_map:
                 f_down = Quartz.CGEventSourceKeyState(st, KEY_FRONT)
                 m_down = Quartz.CGEventSourceKeyState(st, KEY_MATTE)
-                if f_down or m_down:
+                g_down = Quartz.CGEventSourceKeyState(st, KEY_GANG)
+                if f_down or m_down or g_down:
                     if not _armed:
                         _armed = True
                         _surface, _source = _decide_surface()
@@ -358,6 +397,7 @@ def _tick():
                                 _source["name"] if _source else None))
                     _to_front = _to_front or bool(f_down)
                     _to_matte = _to_matte or bool(m_down)
+                    _gang = _gang or bool(g_down)
         elif _btn and not btn:
             if _armed:
                 if _surface and _surface.get("kind") == "action":
@@ -372,7 +412,7 @@ def _tick():
                         mode = "front"
                     samples = [p[0] for p in _pairs if p[0] is not None]
                 _fire(samples[-1] if samples else None, _source, mode,
-                      _surface, _act_obj)
+                      _surface, _act_obj, _gang)
             _armed = False
         _btn = btn
     except Exception as e:
