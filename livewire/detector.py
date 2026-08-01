@@ -167,20 +167,44 @@ def _app_active():
 
 
 def _nudge_flame():
-    """Wake Flame's native event loop. Flame repaints the schematic only
-    when its loop sees events; while the browser popup holds focus the
-    loop is starved, so commits land in the batch but stay invisible
-    until the user clicks Flame. An in-process NSApplicationDefined
-    event feeds the loop without side effects."""
+    """Wake Flame's redraw after a commit made while the popup holds
+    focus. Flame repaints when processing its own input events (classic
+    redraw-after-input), so: pump Qt's dispatcher (input excluded), then
+    post a synthetic no-op mouse-move addressed to Flame's main window —
+    the closest in-process imitation of the schematic click that is
+    known to trigger the repaint. (A bare NSApplicationDefined post was
+    not enough — tried and falsified.)"""
     try:
-        from AppKit import NSApplication, NSEvent, NSApplicationDefined
-        app = NSApplication.sharedApplication()
-        ev = (NSEvent.
-              otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2_(
-                  NSApplicationDefined, (0, 0), 0, 0.0, 0, None, 0, 0, 0))
-        app.postEvent_atStart_(ev, False)
+        from PySide6 import QtCore
+        QtCore.QCoreApplication.sendPostedEvents()
+        QtCore.QCoreApplication.processEvents(
+            QtCore.QEventLoop.ExcludeUserInputEvents, 20)
     except Exception:
         pass
+    try:
+        import AppKit
+        app = AppKit.NSApplication.sharedApplication()
+        main = None
+        for w in app.windows():
+            try:
+                f = w.frame()
+                if w.isVisible() and (main is None
+                                      or f.size.width > main.frame().size.width):
+                    main = w
+            except Exception:
+                pass
+        if main is not None:
+            mtype = getattr(AppKit, "NSEventTypeMouseMoved",
+                            getattr(AppKit, "NSMouseMoved", 5))
+            f = main.frame()
+            loc = (f.size.width / 2.0, f.size.height / 2.0)
+            ev = (AppKit.NSEvent.
+                  mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure_(
+                      mtype, loc, 0, 0.0, main.windowNumber(), None,
+                      0, 0, 0.0))
+            app.postEvent_atStart_(ev, False)
+    except Exception as e:
+        _log("nudge failed: %r" % e)
 
 
 def _pick(names, needle):
@@ -420,9 +444,14 @@ def _decide_surface():
     """
     bat_samples = [p[0] for p in _pairs if p[0] is not None]
     act_samples = [p[1] for p in _pairs if p[1] is not None]
-    diverged = any(p[0] is not None and p[1] is not None and p[0] != p[1]
+    # When Batch is active, an open Action's feed MIRRORS the batch feed
+    # — but the two are read sequentially per tick, so fast drags show
+    # tiny skews between them. Exact equality on ANY pair is therefore
+    # the batch tell (mirroring hits it constantly at pauses); a truly
+    # open Action schematic has its own origin/zoom and never matches.
+    mirrored = any(p[0] is not None and p[1] is not None and p[0] == p[1]
                    for p in _pairs)
-    if _act_name is not None and diverged:
+    if _act_name is not None and not mirrored:
         src = _find_source(act_samples, _act_map, with_sockets=False)
         act_moving = len(set(act_samples)) >= 2
         if src is not None or act_moving:
