@@ -1,0 +1,155 @@
+# forge-livewire — Artist Guide
+
+Livewire gives Flame the node browser the schematic always deserved:
+pull a noodle, tap a key, type a few letters, and the node you wanted is
+created at the drop point — already wired. It works in Batch and inside
+Action, and it knows your Matchboxes, your user bins, and your OFX.
+
+Everything livewire creates is a normal Flame node made through Flame's
+own API. There is nothing special to render, save, or clean up, and
+Ctrl+Z works exactly as if you had built it by hand.
+
+## Setup (once)
+
+```bash
+/opt/Autodesk/python/2026.2.2/bin/python3.11 -m pip install \
+    --target /path/to/forge-livewire/vendor pyobjc-framework-Quartz
+
+ln -s /path/to/forge-livewire/hooks/livewire_hook.py \
+      /opt/Autodesk/shared/python/livewire_hook.py
+```
+
+Restart Flame (or rescan python hooks). That's it — livewire is now
+armed in every session. macOS only for now.
+
+## The gesture
+
+1. **Pull a noodle** out of any node's output socket — a completely
+   normal connection drag.
+2. **While still holding**, tap an arm key: **F**, **G**, or **R**
+   (add **M** for matte wiring — see below).
+3. **Let go over empty schematic space.** The noodle cancels, and the
+   search popup appears right where you dropped it.
+4. **Type to narrow, Enter to commit.** ↑/↓ choose, Esc or clicking
+   anywhere else cancels.
+
+The arm keys are only watched mid-drag. F, G, R, and M all keep their
+normal Flame meanings the rest of the time.
+
+## The three verbs
+
+Think of it as: **F converges, G chains, R replicates.**
+
+### F — insert one node
+
+Pull from `plate`, tap **F**, drop, type `bl`, Enter → a Blur wired
+`plate → Blur`, sitting exactly where you dropped it.
+
+- **F then M** (same drag): wires front *and* matte — the source's
+  image output to the new node's Front and its matte output (e.g. a
+  keyer's `OutMatte`) to the Matte input. Livewire only wires a matte
+  when the source really has a matte output — it never routes an image
+  output into a Matte input.
+- **M alone**: the connection goes to the new node's Matte input, and
+  the socket menu pre-selects the source's matte output.
+- If the source has several outputs, a menu above the search field lets
+  you pick which one feeds the connection (defaults to `Result`).
+
+### F with several nodes selected — converge
+
+Select two or more nodes, then pull from **one of the selected ones**:
+
+- Pick a **Comp** (or Blend & Comp): the grabbed node feeds Front, the
+  *other* selected node feeds **Back** — with F+M, mattes land on Matte
+  and Back Matte too. A four-wire comp from one pull.
+- Pick an **Action**: the grabbed node feeds `Back`, and every other
+  selected node gets **its own media layer**, wired in selection order.
+  Select beauty + normals + motion vectors + Z, pull, F, `action`,
+  Enter — a fully loaded Action, every pass ingested.
+
+Pulling from a node that *isn't* selected ignores the selection — no
+surprises from a leftover selection somewhere in the schematic.
+
+### G — gang (build a pipe)
+
+Pull, tap **G**, drop. The browser stays open: every Enter commits a
+node *immediately* and the next pick chains off it, marching right —
+`blur↵ cc↵ regrain↵ Esc` builds `plate → Blur → CC → Regrain` in four
+keystrokes. The header shows the growing trail. **Esc ends the gang** —
+everything is already committed; regret is Ctrl+Z.
+
+**G then M**: every link wires front+matte (where the upstream node
+really has a matte output). In Action, gangs build *downward* as a
+parent chain, matching Action's layout.
+
+### R — replicate (one recipe, many nodes)
+
+Select several nodes, pull from one of them, tap **R**, drop. Now every
+pick applies to **each selected node**: pick Blur → every selected node
+grows its own Blur, each in line with its own source. Keep picking and
+all the chains extend in parallel; Esc ends them all.
+
+Five shots that all need `Resize → Burn-in`? Select the five, pull, R,
+`resize↵ burn↵ Esc`. Ten nodes, wired and placed, in three seconds.
+
+## What's in the browser
+
+Everything Flame can make, tagged by origin:
+
+- **Node types** — the standard Batch tools (or Action's node types
+  when you're inside an Action).
+- **`Blur - Matchbox`** — stock Matchbox shaders, created with the
+  shader already loaded.
+- **`Lens_Blur - User`** — your saved user-bin setups, appended at the
+  drop point and wired in (multi-node bins come in as a group).
+- **`Reduce Noise v6 - OpenFX`** — OFX plugins, created with the plugin
+  selected.
+
+With an empty search box, the list is ordered by **your** habits —
+Flame's own favorites first, then your most-used tools. Search matches
+prefer prefixes, then word starts, then anything-inside, then fuzzy.
+
+Installed new shaders or saved new bins mid-session? Run
+`livewire.reindex()` in the Flame python console, or just restart.
+
+## Inside Action
+
+Same gesture on Action's schematic: drag a link, tap any arm key, drop.
+The browser lists Action's nodes (Axis, Light, Surface, GMask, …), the
+header reads `parent <node>`, and the pick becomes a child of the
+grabbed node — or unparented if you grabbed empty space. Livewire
+figures out which schematic you're in per-drag; there is no mode to
+switch.
+
+## Quick reference
+
+| Keys (while dragging) | Result |
+|---|---|
+| **F** | one node, source → Front |
+| **M** | one node, source matte output → Matte |
+| **F + M** | one node, front *and* matte wired |
+| **F**, multi-select | converge: Back pair on Comps, media layers on Action |
+| **G** | gang: chain picks off the grab until Esc |
+| **G + M** | gang with front+matte links |
+| **R**, multi-select | replicate picks onto every selected node until Esc |
+| **R + M** | replicate with front+matte links |
+| **Enter** | commit the highlighted entry |
+| **↑ / ↓** | move the highlight |
+| **Esc / click away** | close (ends a gang/replicate — already committed) |
+
+## Tips and honest limits
+
+- **Arm while the button is down.** Tapping F before you grab or after
+  you release does nothing (and bare F is Flame's own Timeline hotkey).
+- **Which output did I grab?** Livewire can't tell yet — it uses
+  `Result` (or your menu pick). Pulling the matte noodle specifically
+  doesn't change the wiring today; use **M** for matte intent.
+- **OFX list is learned, not exhaustive** — plugins you've used appear;
+  a brand-new plugin shows up after its first manual use.
+- **Wrong node in the header?** Zoomed way out, node anchors crowd
+  together and the grab can resolve to a neighbor. Zoom in a touch.
+- A gang pick occasionally paints a beat late — the node is already
+  committed; it's Flame's redraw catching up.
+- Keyboard layouts: the arm keys are US-layout virtual keycodes; on
+  ISO/Nordic boards letters are fine, but if a key ever seems dead,
+  see the constants at the top of `livewire/detector.py`.

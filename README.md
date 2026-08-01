@@ -12,6 +12,10 @@ and native to Batch.
 Flame's own node search (the Tools/Learn popup) can't be invoked from a
 noodle. This closes that gap.
 
+**Artists: start with the [Artist Guide](docs/GUIDE.md)** — gestures,
+the three verbs, workflow examples, and tips, with none of the
+implementation detail below.
+
 ## Requirements
 
 - Flame **2026.x on macOS** (developed and validated on 2026.2.2).
