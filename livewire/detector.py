@@ -272,11 +272,13 @@ def _commit_batch(entry, out_socket, cp, source, mode):
         if mode == "front_matte":
             front_out = ("Result" if "Result" in outs
                          else (outs[0] if outs else None))
-            matte_out = _pick(outs, "matte") or front_out
+            # only wire a matte when the source really has a matte
+            # output — never route the image output into a Matte input
+            matte_out = _pick(outs, "matte")
             front_in = _pick_in(ins, image=True) or (ins[0] if ins else None)
             matte_in = _pick_in(ins, image=False)
             _connect(src, front_out, new, front_in)
-            if matte_in:
+            if matte_in and matte_out:
                 _connect(src, matte_out, new, matte_in)
         else:
             in_sock = (_pick_in(ins, image=(mode != "matte"))
@@ -302,8 +304,8 @@ def _commit_batch(entry, out_socket, cp, source, mode):
             _connect(exsrc, img_out, new, back_in)
             if mode == "front_matte":
                 back_matte_in = _pick_in(ins, image=False, back=True)
-                if back_matte_in:
-                    matte_out = _pick(exouts, "matte") or img_out
+                matte_out = _pick(exouts, "matte")
+                if back_matte_in and matte_out:
                     _connect(exsrc, matte_out, new, back_matte_in)
     return out_node
 
