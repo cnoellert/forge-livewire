@@ -166,6 +166,23 @@ def _app_active():
         return True
 
 
+def _nudge_flame():
+    """Wake Flame's native event loop. Flame repaints the schematic only
+    when its loop sees events; while the browser popup holds focus the
+    loop is starved, so commits land in the batch but stay invisible
+    until the user clicks Flame. An in-process NSApplicationDefined
+    event feeds the loop without side effects."""
+    try:
+        from AppKit import NSApplication, NSEvent, NSApplicationDefined
+        app = NSApplication.sharedApplication()
+        ev = (NSEvent.
+              otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2_(
+                  NSApplicationDefined, (0, 0), 0, 0.0, 0, None, 0, 0, 0))
+        app.postEvent_atStart_(ev, False)
+    except Exception:
+        pass
+
+
 def _pick(names, needle):
     """First name containing needle (case-insensitive), else None."""
     for n in names:
@@ -380,6 +397,7 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
             # directly — schedule_idle_event would sit in Flame's idle
             # queue until the user next touches Flame's own UI.
             do()
+            _nudge_flame()
 
         browser.show_browser(
             entries=entries,
