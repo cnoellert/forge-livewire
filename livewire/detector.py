@@ -251,7 +251,11 @@ def _commit_batch(entry, out_socket, cp, source, mode):
         else:
             needle = "matte" if mode == "matte" else "front"
             in_sock = _pick(ins, needle) or (ins[0] if ins else None)
-            _connect(src, out_socket, new, in_sock)
+            # Batch connect_nodes has no 2-arg form: always resolve an
+            # output socket (chained gang picks arrive without one).
+            use_out = out_socket or ("Result" if "Result" in outs
+                                     else (outs[0] if outs else None))
+            _connect(src, use_out, new, in_sock)
     return out_node
 
 
