@@ -65,6 +65,8 @@ livewire.install()
    | **F then M** (both, same drag) | source's image output (`Result`, or first) → **Front** *and* source's matte output → **Matte** |
    | **G** | **gang (chain) mode** — the browser stays open; every Enter commits a node immediately, chained `Result` → `Front` off the previous one, marching right. Esc or click-away ends the gang |
    | **G then M** | gang with **front+matte** wiring on every link |
+   | **R** | **replicate mode** — with several nodes selected (grab one of them), every pick is applied to *each* selected node: N parallel chains, one per source, each building in line with its own node. No fan-in. Esc ends all chains |
+   | **R then M** | replicate with front+matte links (mattes only where a source really has a matte output) |
 
 3. **Release over empty schematic space.** The noodle cancels natively and
    the search popup appears at the drop point.
@@ -74,6 +76,22 @@ livewire.install()
 
 The new node is created at the exact schematic position where you dropped
 the noodle and connected per the table above.
+
+The three verbs: **F converges** (many sources into one node),
+**G chains** (one pipe off the grab), **R replicates** (one recipe onto
+every selected node).
+
+**Multi-select changes what F and G converge into.** With two or more
+nodes selected and the grab on one of them:
+- picking a node with a back pair (Comp, Blend & Comp) wires the second
+  selected node to **Back** (and **Back Matte** in F+M mode);
+- picking **Action** wires the grabbed node to `Back` and creates **one
+  media layer per remaining selected node**, each wired
+  `Result` → media `Front` (+ real matte → media `Matte` in F+M mode)
+  in selection order — a full AOV ingest in one gesture.
+In a gang the fan-in applies to the first link only; the chain then
+continues single-source. Pulling from an *unselected* node ignores the
+selection entirely.
 
 **Inside an Action schematic** the same gesture works: drag a link, tap
 **F or M** (equivalent there), release. The browser lists Action's node
@@ -91,8 +109,10 @@ which output feeds the connection (defaults to `Result`; in a gang it
 applies to the first link only). Everything a gang commits is already
 in the schematic — ending it changes nothing, and regret is Ctrl+Z.
 
-F and M are only watched **while a connection drag is in flight** — they
-keep their normal Flame meanings the rest of the time.
+Arm keys are only watched **while a connection drag is in flight** —
+F, M, G, and R keep their normal Flame meanings the rest of the time.
+(Tab, backtick, and C were rejected as arm keys: Tab tabs the
+schematic, backtick is assigned in Action, C is the Batch compass.)
 
 ## The index
 
