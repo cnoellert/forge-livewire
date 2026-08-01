@@ -431,6 +431,14 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
                 try:
                     _log("do() begin: %s" % entry["display"])
                     use_sock = sock if state["first"] else None
+                    # Multi-select fan-in (Action media / back pairs)
+                    # applies to the FIRST pick only; chained picks must
+                    # never see the original selection.
+                    if not state["first"] and state["source"] \
+                            and "extra" in state["source"]:
+                        state["source"] = {
+                            k: v for k, v in state["source"].items()
+                            if k != "extra"}
                     if is_action:
                         new = _commit_action(entry, state["cp"],
                                              state["source"],
@@ -445,6 +453,8 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
                             outs = []
                     name = str(_attr(new.name))
                     _log("do() created+wired: %s" % name)
+                    # fresh dict deliberately drops "extra": the chain
+                    # continues single-source from the new node
                     state["source"] = {"name": name, "sockets": outs}
                     if is_action:
                         state["cp"] = (float(_attr(new.pos_x)),
