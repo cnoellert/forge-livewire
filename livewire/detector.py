@@ -321,7 +321,10 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
                             "action" if is_action else "batch", mode))
                 except Exception as e:
                     print("[livewire] commit failed: %r" % e)
-            flame.schedule_idle_event(do)
+            # Browser callbacks run on Flame's main thread, so commit
+            # directly — schedule_idle_event would sit in Flame's idle
+            # queue until the user next touches Flame's own UI.
+            do()
 
         browser.show_browser(
             entries=entries,
@@ -411,7 +414,9 @@ def _tick():
                     if _to_front and _to_matte:
                         mode = "front_matte"
                     elif _to_matte:
-                        mode = "matte"
+                        # gm mirrors fm: a gang's M means front+matte
+                        # links (matte-only chains aren't a thing)
+                        mode = "front_matte" if _gang else "matte"
                     else:
                         mode = "front"
                     samples = [p[0] for p in _pairs if p[0] is not None]
