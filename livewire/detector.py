@@ -40,6 +40,7 @@ from . import indexer
 KEY_FRONT = 3    # macOS vkey: F
 KEY_MATTE = 46   # macOS vkey: M
 KEY_GANG = 5     # macOS vkey: G
+KEY_CHAINSEL = 8  # macOS vkey: C — replicate picks across the selection
 
 CHAIN_DX_BATCH = 200   # batch chains march right
 CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
@@ -58,6 +59,7 @@ _armed = False
 _to_front = False
 _to_matte = False
 _gang = False          # G tapped during the drag: chain mode
+_chain_sel = False     # C tapped: parallel chains across the selection
 _pairs = []            # [(batch_cpos, action_cpos|None), ...] this drag
 _bat_map = []          # [(name, x, y)] batch nodes, snapshotted at press
 _act_map = []          # [(name, x, y)] open action's nodes
@@ -399,7 +401,8 @@ def _commit_action(entry, cp, source, action_name):
     return new
 
 
-def _fire(release_guess, source, mode, surface, act_obj, gang):
+def _fire(release_guess, source, mode, surface, act_obj, gang,
+          parallel_req=False):
     def show():
         is_action = bool(surface and surface.get("kind") == "action")
         if is_action:
@@ -415,8 +418,28 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
         if cp is None:
             return
 
-        # Mutable across a gang: each pick chains from the previous one.
-        state = {"source": source, "cp": cp, "first": True, "nsloc": None}
+        # Chains, mutable across a gang. Normally one chain from the
+        # drop point. C (chain-selection) = PARALLEL chains: the same
+        # picks replicate onto every selected node, each chain building
+        # in line with its own source (no fan-in — that's F's job; and
+        # G keeps its first-link fan-in behavior).
+        parallel = bool(parallel_req and not is_action and source
+                        and source.get("extra"))
+        if parallel:
+            posmap = {n: (x, y) for (n, x, y) in _bat_map}
+            chains = []
+            for nm in ([source["name"]]
+                       + [e["name"] for e in source["extra"]]):
+                p = posmap.get(nm)
+                start = (p[0] + CHAIN_DX_BATCH, p[1]) if p else cp
+                chains.append({"source": {"name": nm,
+                                          "sockets": _output_sockets(nm)},
+                               "cp": start, "first": True})
+            source = {"name": u"%d selected" % len(chains), "sockets": []}
+        else:
+            chains = [{"source": source, "cp": cp, "first": True}]
+
+        state = {"nsloc": None}
         try:
             import AppKit
             p = AppKit.NSEvent.mouseLocation()  # cursor is at the drop
@@ -425,55 +448,57 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
             pass
 
         def on_commit(entry, sock):
-            _log("on_commit called: %s (mode=%s)" % (entry["display"], mode))
+            _log("on_commit called: %s (mode=%s, chains=%d)"
+                 % (entry["display"], mode, len(chains)))
 
-            def do():
-                try:
-                    _log("do() begin: %s" % entry["display"])
-                    use_sock = sock if state["first"] else None
-                    # Multi-select fan-in (Action media / back pairs)
-                    # applies to the FIRST pick only; chained picks must
-                    # never see the original selection.
-                    if not state["first"] and state["source"] \
-                            and "extra" in state["source"]:
-                        state["source"] = {
-                            k: v for k, v in state["source"].items()
-                            if k != "extra"}
-                    if is_action:
-                        new = _commit_action(entry, state["cp"],
-                                             state["source"],
-                                             surface["action"])
+            def do_chain(ch):
+                use_sock = sock if ch["first"] else None
+                src_ctx = ch["source"]
+                # Multi-select fan-in (Action media / back pairs)
+                # applies to the FIRST pick only; chained picks must
+                # never see the original selection.
+                if not ch["first"] and src_ctx and "extra" in src_ctx:
+                    src_ctx = {k: v for k, v in src_ctx.items()
+                               if k != "extra"}
+                    ch["source"] = src_ctx
+                if parallel and use_sock:
+                    # per-chain sanity: only honor the socket menu where
+                    # that source actually has the socket
+                    if use_sock not in (src_ctx.get("sockets") or []):
+                        use_sock = None
+                if is_action:
+                    new = _commit_action(entry, ch["cp"], src_ctx,
+                                         surface["action"])
+                    outs = []
+                else:
+                    new = _commit_batch(entry, use_sock, ch["cp"],
+                                        src_ctx, mode)
+                    try:
+                        outs = [str(s) for s in _attr(new.output_sockets)]
+                    except Exception:
                         outs = []
-                    else:
-                        new = _commit_batch(entry, use_sock, state["cp"],
-                                            state["source"], mode)
-                        try:
-                            outs = [str(s) for s in _attr(new.output_sockets)]
-                        except Exception:
-                            outs = []
-                    name = str(_attr(new.name))
-                    _log("do() created+wired: %s" % name)
-                    # fresh dict deliberately drops "extra": the chain
-                    # continues single-source from the new node
-                    state["source"] = {"name": name, "sockets": outs}
-                    if is_action:
-                        state["cp"] = (float(_attr(new.pos_x)),
-                                       float(_attr(new.pos_y))
-                                       - CHAIN_DY_ACTION)
-                    else:
-                        state["cp"] = (float(_attr(new.pos_x))
-                                       + CHAIN_DX_BATCH,
-                                       float(_attr(new.pos_y)))
-                    state["first"] = False
-                    _log("created %s [%s/%s]"
-                         % (entry["display"],
-                            "action" if is_action else "batch", mode))
-                except Exception as e:
-                    print("[livewire] commit failed: %r" % e)
+                name = str(_attr(new.name))
+                _log("do() created+wired: %s" % name)
+                # fresh dict deliberately drops "extra": the chain
+                # continues single-source from the new node
+                ch["source"] = {"name": name, "sockets": outs}
+                if is_action:
+                    ch["cp"] = (float(_attr(new.pos_x)),
+                                float(_attr(new.pos_y)) - CHAIN_DY_ACTION)
+                else:
+                    ch["cp"] = (float(_attr(new.pos_x)) + CHAIN_DX_BATCH,
+                                float(_attr(new.pos_y)))
+                ch["first"] = False
+
             # Browser callbacks run on Flame's main thread, so commit
             # directly — schedule_idle_event would sit in Flame's idle
             # queue until the user next touches Flame's own UI.
-            do()
+            for ch in chains:
+                try:
+                    do_chain(ch)
+                except Exception as e:
+                    print("[livewire] commit failed (%s): %r"
+                          % (ch["source"].get("name"), e))
             # Burst: Flame dirties some layout (e.g. Action media
             # attachment) in its own deferred pass AFTER the first
             # repaint, so nudge again shortly; jitter each synthetic
@@ -531,7 +556,7 @@ def _decide_surface():
 
 
 def _tick():
-    global _btn, _armed, _to_front, _to_matte, _gang, _pairs
+    global _btn, _armed, _to_front, _to_matte, _gang, _chain_sel, _pairs
     global _bat_map, _act_map, _act_name, _act_obj, _surface, _source, err
     try:
         st = Quartz.kCGEventSourceStateCombinedSessionState
@@ -542,6 +567,7 @@ def _tick():
             _to_front = False
             _to_matte = False
             _gang = False
+            _chain_sel = False
             _source = None
             _surface = None
             if _app_active():
@@ -567,7 +593,8 @@ def _tick():
                 f_down = Quartz.CGEventSourceKeyState(st, KEY_FRONT)
                 m_down = Quartz.CGEventSourceKeyState(st, KEY_MATTE)
                 g_down = Quartz.CGEventSourceKeyState(st, KEY_GANG)
-                if f_down or m_down or g_down:
+                c_down = Quartz.CGEventSourceKeyState(st, KEY_CHAINSEL)
+                if f_down or m_down or g_down or c_down:
                     if not _armed:
                         _armed = True
                         _surface, _source = _decide_surface()
@@ -577,8 +604,10 @@ def _tick():
                     _to_front = _to_front or bool(f_down)
                     _to_matte = _to_matte or bool(m_down)
                     _gang = _gang or bool(g_down)
+                    _chain_sel = _chain_sel or bool(c_down)
         elif _btn and not btn:
             if _armed:
+                gang_like = _gang or _chain_sel
                 if _surface and _surface.get("kind") == "action":
                     mode = "child"
                     samples = [p[1] for p in _pairs if p[1] is not None]
@@ -586,14 +615,15 @@ def _tick():
                     if _to_front and _to_matte:
                         mode = "front_matte"
                     elif _to_matte:
-                        # gm mirrors fm: a gang's M means front+matte
+                        # gm/cm mirror fm: a gang's M means front+matte
                         # links (matte-only chains aren't a thing)
-                        mode = "front_matte" if _gang else "matte"
+                        mode = "front_matte" if gang_like else "matte"
                     else:
                         mode = "front"
                     samples = [p[0] for p in _pairs if p[0] is not None]
                 _fire(samples[-1] if samples else None, _source, mode,
-                      _surface, _act_obj, _gang)
+                      _surface, _act_obj, gang_like,
+                      parallel_req=_chain_sel)
             _armed = False
         _btn = btn
     except Exception as e:
