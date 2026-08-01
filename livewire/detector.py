@@ -424,6 +424,9 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
         # picks replicate onto every selected node, each chain building
         # in line with its own source (no fan-in — that's F's job; and
         # G keeps its first-link fan-in behavior).
+        # NB: never assign to `source` in this scope — it would shadow
+        # the closure variable and UnboundLocalError the whole function.
+        disp_source = source
         parallel = bool(parallel_req and not is_action and source
                         and source.get("extra"))
         if parallel:
@@ -436,7 +439,8 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
                 chains.append({"source": {"name": nm,
                                           "sockets": _output_sockets(nm)},
                                "cp": start, "first": True})
-            source = {"name": u"%d selected" % len(chains), "sockets": []}
+            disp_source = {"name": u"%d selected" % len(chains),
+                           "sockets": []}
         else:
             chains = [{"source": source, "cp": cp, "first": True}]
 
@@ -513,7 +517,7 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
 
         browser.show_browser(
             entries=entries,
-            source=source,
+            source=disp_source,
             mode=mode,
             kind=(surface or {}).get("kind", "batch"),
             chain=gang,
