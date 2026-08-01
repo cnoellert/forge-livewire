@@ -132,6 +132,30 @@ Live cursor position in **schematic space**, same coordinate system as
 - `detector._debug` is a 200-entry timestamped ring buffer of livewire
   events — first stop when behavior looks timing-dependent.
 
+## Making Flame repaint while a Qt popup holds focus (2026-07-29)
+
+Flame repaints its schematics only while processing its own input
+events (redraw-after-input). While a focused Qt popup starves it, API
+commits land (<10 ms, per the ring buffer) but stay **invisible** until
+the user clicks Flame. Escalation ladder, each step falsified live:
+
+1. `NSApplicationDefined` posted to NSApp — processed, no repaint.
+2. Qt dispatcher pump (`processEvents(ExcludeUserInputEvents)`) —
+   insufficient alone.
+3. Synthetic `NSEventTypeMouseMoved` posted to Flame's main window at
+   the **window center** — wakes the Batch panel, misses Action's.
+4. Same synthetic move aimed at the **drop point** (capture
+   `NSEvent.mouseLocation()` when the browser opens — the cursor is in
+   the working schematic right then; convert to window coords via the
+   frame origin) — ✅ repaints both Batch and Action, per commit.
+
+Corollary: panel repaint is hover-local — the move must land on the
+panel you want redrawn.
+
+- Action schematic layout is vertical: children sit *below* parents
+  (smaller y). Chains/gangs in Action should build downward; Batch
+  builds rightward.
+
 ## Gesture classification plan
 
 - Socket grab: early-drag `cursor_position` near a node anchor with the
