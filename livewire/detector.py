@@ -335,25 +335,51 @@ def _commit_batch(entry, out_socket, cp, source, mode):
             use_out = out_socket or ("Result" if "Result" in outs
                                      else (outs[0] if outs else None))
             _connect(src, use_out, new, in_sock)
-        # Additional selected sources fill the back pair on nodes that
-        # have one (Comp, Blend & Comp, ...). First extra only for now —
-        # further pairs have no conventional socket names yet.
-        for ex in (source.get("extra") or [])[:1]:
-            back_in = _pick_in(ins, image=True, back=True)
-            if back_in is None:
-                _log("no back input on %s for extra source %s"
-                     % (entry["display"], ex["name"]))
-                break
-            exsrc = flame.batch.get_node(ex["name"])
-            exouts = ex.get("sockets") or []
-            img_out = ("Result" if "Result" in exouts
-                       else (exouts[0] if exouts else None))
-            _connect(exsrc, img_out, new, back_in)
-            if mode == "front_matte":
-                back_matte_in = _pick_in(ins, image=False, back=True)
-                matte_out = _pick(exouts, "matte")
-                if back_matte_in and matte_out:
-                    _connect(exsrc, matte_out, new, back_matte_in)
+        extras = source.get("extra") or []
+        if extras and hasattr(new, "add_media"):
+            # Action: one media layer per additional selected node,
+            # wired in selection order. add_media() returns the Action
+            # Media batch node (ins Front/Matte); Flame auto-places it
+            # attached to the Action.
+            for ex in extras:
+                try:
+                    media = new.add_media()
+                except Exception as e:
+                    _log("add_media failed: %r" % e)
+                    break
+                exsrc = flame.batch.get_node(ex["name"])
+                exouts = ex.get("sockets") or []
+                img_out = ("Result" if "Result" in exouts
+                           else (exouts[0] if exouts else None))
+                m_ins = [str(s) for s in _attr(media.input_sockets)]
+                front_in = (_pick_in(m_ins, image=True)
+                            or (m_ins[0] if m_ins else None))
+                _connect(exsrc, img_out, media, front_in)
+                if mode == "front_matte":
+                    matte_out = _pick(exouts, "matte")
+                    matte_in = _pick_in(m_ins, image=False)
+                    if matte_out and matte_in:
+                        _connect(exsrc, matte_out, media, matte_in)
+        else:
+            # Non-Action nodes: extras fill the back pair where one
+            # exists (Comp, Blend & Comp, ...). First extra only —
+            # further pairs have no conventional socket names yet.
+            for ex in extras[:1]:
+                back_in = _pick_in(ins, image=True, back=True)
+                if back_in is None:
+                    _log("no back input on %s for extra source %s"
+                         % (entry["display"], ex["name"]))
+                    break
+                exsrc = flame.batch.get_node(ex["name"])
+                exouts = ex.get("sockets") or []
+                img_out = ("Result" if "Result" in exouts
+                           else (exouts[0] if exouts else None))
+                _connect(exsrc, img_out, new, back_in)
+                if mode == "front_matte":
+                    back_matte_in = _pick_in(ins, image=False, back=True)
+                    matte_out = _pick(exouts, "matte")
+                    if back_matte_in and matte_out:
+                        _connect(exsrc, matte_out, new, back_matte_in)
     return out_node
 
 
