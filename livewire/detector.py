@@ -510,7 +510,8 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
             # move a pixel so same-position moves aren't coalesced away.
             base = state.get("nsloc")
             _nudge_flame(base)
-            for delay, (jx, jy) in ((120, (1, 0)), (350, (0, 1))):
+            for delay, (jx, jy) in ((100, (1, 0)), (250, (0, 1)),
+                                    (600, (1, 1))):
                 loc = (base[0] + jx, base[1] + jy) if base else None
                 QtCore.QTimer.singleShot(
                     delay, lambda loc=loc: _nudge_flame(loc))
@@ -554,6 +555,7 @@ def _decide_surface():
     # once nodes with more input pairs are supported).
     if src is not None:
         sel = _selection_names()
+        _log("selection at arm: %s (grab=%s)" % (sel, src["name"]))
         if len(sel) >= 2 and src["name"] in sel:
             src["extra"] = [{"name": n, "sockets": _output_sockets(n)}
                             for n in sel if n != src["name"]]
