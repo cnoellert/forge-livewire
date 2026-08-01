@@ -138,6 +138,7 @@ class NodeBrowser(QtWidgets.QWidget):
         self._socket_combo = None
         self._committed = False
         self._chain = chain
+        self._source = source
         self._trail = [source["name"]] if (source and source.get("name")) \
             else []
         self._header = None
@@ -192,15 +193,19 @@ class NodeBrowser(QtWidgets.QWidget):
     def _update_header(self):
         if self._header is None:
             return
+        extras = (self._source or {}).get("extra") or []
+        back = (u"   back  %s" % ", ".join(e["name"] for e in extras)
+                if extras else u"")
         if self._chain:
             trail = "  >  ".join(self._trail) if self._trail else "(new)"
-            self._header.setText(u"gang  %s" % trail)
+            self._header.setText(u"gang  %s%s" % (trail, back))
         elif self._kind == "action":
             self._header.setText(u"parent  %s" % self._trail[0])
         else:
             suffix = {"matte": u"  (to matte)",
                       "front_matte": u"  (front+matte)"}.get(self._mode, u"")
-            self._header.setText(u"from  %s%s" % (self._trail[0], suffix))
+            self._header.setText(u"from  %s%s%s"
+                                 % (self._trail[0], suffix, back))
 
     # -- filtering ---------------------------------------------------------
 

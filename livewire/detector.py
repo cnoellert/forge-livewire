@@ -174,6 +174,30 @@ def _pick(names, needle):
     return None
 
 
+def _pick_in(ins, image=True, back=False):
+    """Pick an input socket by role: image vs matte, front-pair vs
+    back-pair ('Front'/'Matte' vs 'Back'/'Back Matte')."""
+    for s in ins:
+        low = s.lower()
+        if ("back" in low) != back:
+            continue
+        if image and "matte" not in low:
+            return s
+        if not image and "matte" in low:
+            return s
+    return None
+
+
+def _selection_names():
+    try:
+        sel = flame.batch.selected_nodes
+        if hasattr(sel, "get_value"):
+            sel = sel.get_value()
+        return [str(_attr(n.name)) for n in sel]
+    except Exception:
+        return []
+
+
 def _connect(src, out_sock, new, in_sock):
     try:
         if out_sock and in_sock:
@@ -249,19 +273,38 @@ def _commit_batch(entry, out_socket, cp, source, mode):
             front_out = ("Result" if "Result" in outs
                          else (outs[0] if outs else None))
             matte_out = _pick(outs, "matte") or front_out
-            front_in = _pick(ins, "front") or (ins[0] if ins else None)
-            matte_in = _pick(ins, "matte")
+            front_in = _pick_in(ins, image=True) or (ins[0] if ins else None)
+            matte_in = _pick_in(ins, image=False)
             _connect(src, front_out, new, front_in)
             if matte_in:
                 _connect(src, matte_out, new, matte_in)
         else:
-            needle = "matte" if mode == "matte" else "front"
-            in_sock = _pick(ins, needle) or (ins[0] if ins else None)
+            in_sock = (_pick_in(ins, image=(mode != "matte"))
+                       or (ins[0] if ins else None))
             # Batch connect_nodes has no 2-arg form: always resolve an
             # output socket (chained gang picks arrive without one).
             use_out = out_socket or ("Result" if "Result" in outs
                                      else (outs[0] if outs else None))
             _connect(src, use_out, new, in_sock)
+        # Additional selected sources fill the back pair on nodes that
+        # have one (Comp, Blend & Comp, ...). First extra only for now —
+        # further pairs have no conventional socket names yet.
+        for ex in (source.get("extra") or [])[:1]:
+            back_in = _pick_in(ins, image=True, back=True)
+            if back_in is None:
+                _log("no back input on %s for extra source %s"
+                     % (entry["display"], ex["name"]))
+                break
+            exsrc = flame.batch.get_node(ex["name"])
+            exouts = ex.get("sockets") or []
+            img_out = ("Result" if "Result" in exouts
+                       else (exouts[0] if exouts else None))
+            _connect(exsrc, img_out, new, back_in)
+            if mode == "front_matte":
+                back_matte_in = _pick_in(ins, image=False, back=True)
+                if back_matte_in:
+                    matte_out = _pick(exouts, "matte") or img_out
+                    _connect(exsrc, matte_out, new, back_matte_in)
     return out_node
 
 
@@ -364,8 +407,16 @@ def _decide_surface():
         act_moving = len(set(act_samples)) >= 2
         if src is not None or act_moving:
             return {"kind": "action", "action": _act_name}, src
-    return ({"kind": "batch"},
-            _find_source(bat_samples, _bat_map, with_sockets=True))
+    src = _find_source(bat_samples, _bat_map, with_sockets=True)
+    # Deliberate multi-select including the grabbed node: the other
+    # selected nodes become additional sources (back pair, and beyond
+    # once nodes with more input pairs are supported).
+    if src is not None:
+        sel = _selection_names()
+        if len(sel) >= 2 and src["name"] in sel:
+            src["extra"] = [{"name": n, "sockets": _output_sockets(n)}
+                            for n in sel if n != src["name"]]
+    return {"kind": "batch"}, src
 
 
 def _tick():
