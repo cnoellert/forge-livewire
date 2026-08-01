@@ -42,6 +42,8 @@ KEY_MATTE = 46   # macOS vkey: M
 KEY_GANG = 5     # macOS vkey: G
 KEY_CHAINSEL = 15  # macOS vkey: R — replicate picks across the selection
                    # (C is taken: compass in the Batch schematic)
+KEY_INGEST = 0     # macOS vkey: A — grab an Action, tap A: scan its
+                   # media inputs and open the map-ingest table
 
 CHAIN_DX_BATCH = 200   # batch chains march right
 CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
@@ -61,8 +63,10 @@ _to_front = False
 _to_matte = False
 _gang = False          # G tapped during the drag: chain mode
 _chain_sel = False     # C tapped: parallel chains across the selection
+_ingest = False        # A tapped: Action map-ingest table
 _pairs = []            # [(batch_cpos, action_cpos|None), ...] this drag
 _bat_map = []          # [(name, x, y)] batch nodes, snapshotted at press
+_bat_types = {}        # name -> node type, same snapshot
 _act_map = []          # [(name, x, y)] open action's nodes
 _act_name = None       # name of the current Action node, if any
 _act_obj = None        # its PyActionNode, held for the drag only
@@ -96,12 +100,15 @@ def _cpos_of(obj):
         return None
 
 
-def _snapshot(nodes):
+def _snapshot(nodes, types=None):
     out = []
     for n in nodes:
         try:
-            out.append((str(_attr(n.name)),
+            name = str(_attr(n.name))
+            out.append((name,
                         float(_attr(n.pos_x)), float(_attr(n.pos_y))))
+            if types is not None:
+                types[name] = str(_attr(n.type))
         except Exception:
             pass
     return out
@@ -402,6 +409,17 @@ def _commit_action(entry, cp, source, action_name):
     return new
 
 
+def _nudge_burst(base):
+    """Burst of repaint nudges: Flame dirties some layout (e.g. Action
+    media attachment) in deferred passes AFTER the first repaint, so
+    nudge repeatedly; jitter each synthetic move a pixel so
+    same-position moves aren't coalesced away."""
+    _nudge_flame(base)
+    for delay, (jx, jy) in ((100, (1, 0)), (250, (0, 1)), (600, (1, 1))):
+        loc = (base[0] + jx, base[1] + jy) if base else None
+        QtCore.QTimer.singleShot(delay, lambda loc=loc: _nudge_flame(loc))
+
+
 def _fire(release_guess, source, mode, surface, act_obj, gang,
           parallel_req=False):
     def show():
@@ -504,17 +522,7 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
                 except Exception as e:
                     print("[livewire] commit failed (%s): %r"
                           % (ch["source"].get("name"), e))
-            # Burst: Flame dirties some layout (e.g. Action media
-            # attachment) in its own deferred pass AFTER the first
-            # repaint, so nudge again shortly; jitter each synthetic
-            # move a pixel so same-position moves aren't coalesced away.
-            base = state.get("nsloc")
-            _nudge_flame(base)
-            for delay, (jx, jy) in ((100, (1, 0)), (250, (0, 1)),
-                                    (600, (1, 1))):
-                loc = (base[0] + jx, base[1] + jy) if base else None
-                QtCore.QTimer.singleShot(
-                    delay, lambda loc=loc: _nudge_flame(loc))
+            _nudge_burst(state.get("nsloc"))
 
         browser.show_browser(
             entries=entries,
@@ -564,6 +572,7 @@ def _decide_surface():
 
 def _tick():
     global _btn, _armed, _to_front, _to_matte, _gang, _chain_sel, _pairs
+    global _ingest, _bat_types
     global _bat_map, _act_map, _act_name, _act_obj, _surface, _source, err
     try:
         st = Quartz.kCGEventSourceStateCombinedSessionState
@@ -575,10 +584,12 @@ def _tick():
             _to_matte = False
             _gang = False
             _chain_sel = False
+            _ingest = False
             _source = None
             _surface = None
             if _app_active():
-                _bat_map = _snapshot(_attr(flame.batch.nodes))
+                _bat_types = {}
+                _bat_map = _snapshot(_attr(flame.batch.nodes), _bat_types)
                 _act_obj = _current_action()
                 if _act_obj is not None:
                     _act_name = str(_attr(_act_obj.name))
@@ -601,7 +612,8 @@ def _tick():
                 m_down = Quartz.CGEventSourceKeyState(st, KEY_MATTE)
                 g_down = Quartz.CGEventSourceKeyState(st, KEY_GANG)
                 c_down = Quartz.CGEventSourceKeyState(st, KEY_CHAINSEL)
-                if f_down or m_down or g_down or c_down:
+                a_down = Quartz.CGEventSourceKeyState(st, KEY_INGEST)
+                if f_down or m_down or g_down or c_down or a_down:
                     if not _armed:
                         _armed = True
                         _surface, _source = _decide_surface()
@@ -612,25 +624,46 @@ def _tick():
                     _to_matte = _to_matte or bool(m_down)
                     _gang = _gang or bool(g_down)
                     _chain_sel = _chain_sel or bool(c_down)
+                    _ingest = _ingest or bool(a_down)
         elif _btn and not btn:
             if _armed:
-                gang_like = _gang or _chain_sel
-                if _surface and _surface.get("kind") == "action":
-                    mode = "child"
-                    samples = [p[1] for p in _pairs if p[1] is not None]
+                if (_ingest and _source is not None
+                        and (_surface or {}).get("kind") != "action"
+                        and _bat_types.get(_source["name"]) == "Action"):
+                    # A on an Action in Batch: open the map-ingest table
+                    src_name = _source["name"]
+
+                    def open_mapper(src_name=src_name):
+                        nsloc = None
+                        try:
+                            import AppKit
+                            p = AppKit.NSEvent.mouseLocation()
+                            nsloc = (float(p.x), float(p.y))
+                        except Exception:
+                            pass
+                        from . import actionmaps
+                        actionmaps.show_mapper(
+                            src_name,
+                            on_done=lambda: _nudge_burst(nsloc))
+                    QtCore.QTimer.singleShot(SETTLE_MS, open_mapper)
                 else:
-                    if _to_front and _to_matte:
-                        mode = "front_matte"
-                    elif _to_matte:
-                        # gm/cm mirror fm: a gang's M means front+matte
-                        # links (matte-only chains aren't a thing)
-                        mode = "front_matte" if gang_like else "matte"
+                    gang_like = _gang or _chain_sel
+                    if _surface and _surface.get("kind") == "action":
+                        mode = "child"
+                        samples = [p[1] for p in _pairs if p[1] is not None]
                     else:
-                        mode = "front"
-                    samples = [p[0] for p in _pairs if p[0] is not None]
-                _fire(samples[-1] if samples else None, _source, mode,
-                      _surface, _act_obj, gang_like,
-                      parallel_req=_chain_sel)
+                        if _to_front and _to_matte:
+                            mode = "front_matte"
+                        elif _to_matte:
+                            # gm/cm mirror fm: a gang's M means
+                            # front+matte links
+                            mode = "front_matte" if gang_like else "matte"
+                        else:
+                            mode = "front"
+                        samples = [p[0] for p in _pairs if p[0] is not None]
+                    _fire(samples[-1] if samples else None, _source, mode,
+                          _surface, _act_obj, gang_like,
+                          parallel_req=_chain_sel)
             _armed = False
         _btn = btn
     except Exception as e:

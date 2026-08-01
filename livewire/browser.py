@@ -302,7 +302,9 @@ def _force_key(w):
         print("[livewire] makeKey failed: %r" % e)
     w.raise_()
     w.activateWindow()
-    w._edit.setFocus(QtCore.Qt.OtherFocusReason)
+    edit = getattr(w, "_edit", None)
+    if edit is not None:
+        edit.setFocus(QtCore.Qt.OtherFocusReason)
 
 
 def show_browser(entries, source, on_commit, mode="front", kind="batch",
