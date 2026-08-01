@@ -474,7 +474,16 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
             # directly — schedule_idle_event would sit in Flame's idle
             # queue until the user next touches Flame's own UI.
             do()
-            _nudge_flame(state.get("nsloc"))
+            # Burst: Flame dirties some layout (e.g. Action media
+            # attachment) in its own deferred pass AFTER the first
+            # repaint, so nudge again shortly; jitter each synthetic
+            # move a pixel so same-position moves aren't coalesced away.
+            base = state.get("nsloc")
+            _nudge_flame(base)
+            for delay, (jx, jy) in ((120, (1, 0)), (350, (0, 1))):
+                loc = (base[0] + jx, base[1] + jy) if base else None
+                QtCore.QTimer.singleShot(
+                    delay, lambda loc=loc: _nudge_flame(loc))
 
         browser.show_browser(
             entries=entries,
