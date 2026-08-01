@@ -41,8 +41,9 @@ KEY_FRONT = 3    # macOS vkey: F
 KEY_MATTE = 46   # macOS vkey: M
 KEY_GANG = 5     # macOS vkey: G
 
-CHAIN_DX_BATCH = 200   # schematic-units step between chained nodes
-CHAIN_DX_ACTION = 130
+CHAIN_DX_BATCH = 200   # batch chains march right
+CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
+                       # parents; smaller y is lower in action space)
 
 VERBOSE = False  # arm/commit chatter in the shell; errors always print
 
@@ -407,10 +408,15 @@ def _fire(release_guess, source, mode, surface, act_obj, gang):
                             outs = []
                     name = str(_attr(new.name))
                     _log("do() created+wired: %s" % name)
-                    dx = CHAIN_DX_ACTION if is_action else CHAIN_DX_BATCH
                     state["source"] = {"name": name, "sockets": outs}
-                    state["cp"] = (float(_attr(new.pos_x)) + dx,
-                                   float(_attr(new.pos_y)))
+                    if is_action:
+                        state["cp"] = (float(_attr(new.pos_x)),
+                                       float(_attr(new.pos_y))
+                                       - CHAIN_DY_ACTION)
+                    else:
+                        state["cp"] = (float(_attr(new.pos_x))
+                                       + CHAIN_DX_BATCH,
+                                       float(_attr(new.pos_y)))
                     state["first"] = False
                     _log("created %s [%s/%s]"
                          % (entry["display"],
