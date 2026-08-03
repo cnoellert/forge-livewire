@@ -71,6 +71,7 @@ livewire.install()
    | **G then M** | gang with **front+matte** wiring on every link |
    | **R** | **replicate mode** — with several nodes selected (grab one of them), every pick is applied to *each* selected node: N parallel chains, one per source, each building in line with its own node. No fan-in. Esc ends all chains |
    | **R then M** | replicate with front+matte links (mattes only where a source really has a matte output) |
+   | **I** | **ingest** — grab an *Action* node: scans its media inputs and opens a table (media, feeder, map-type guess from pass naming, parent-surface picker); Enter creates each map inside the Action, `assign_media`-bound |
 
 3. **Release over empty schematic space.** The noodle cancels natively and
    the search popup appears at the drop point.
@@ -81,9 +82,10 @@ livewire.install()
 The new node is created at the exact schematic position where you dropped
 the noodle and connected per the table above.
 
-The three verbs: **F converges** (many sources into one node),
+The four verbs: **F converges** (many sources into one node),
 **G chains** (one pipe off the grab), **R replicates** (one recipe onto
-every selected node).
+every selected node), **I ingests** (an Action's inputs into their
+proper map nodes).
 
 **Multi-select changes what F and G converge into.** With two or more
 nodes selected and the grab on one of them:

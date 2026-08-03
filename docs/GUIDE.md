@@ -38,7 +38,7 @@ normal Flame meanings the rest of the time.
 
 ## The three verbs
 
-Think of it as: **F converges, G chains, R replicates.**
+Think of it as: **F converges, G chains, R replicates, I ingests.**
 
 ### F — insert one node
 
@@ -92,6 +92,22 @@ all the chains extend in parallel; Esc ends them all.
 Five shots that all need `Resize → Burn-in`? Select the five, pull, R,
 `resize↵ burn↵ Esc`. Ten nodes, wired and placed, in three seconds.
 
+### I — ingest (an Action's passes into maps)
+
+Got an Action with a stack of AOVs noodled into its media inputs —
+normals, motion vectors, position, Z, crypto? Pull from the **Action
+node**, tap **I**, release. Instead of the node browser you get a
+table: one row per media showing what feeds it and a map-type guess
+read from the pass names (`_N` → Normal Map, `MV`/`vectors` → Motion
+Vectors Map, `P` → Position, `Z` → Z-Depth, `crypto`/`ID` → Object ID,
+`albedo`/`bty` → Diffuse, and so on). Correct any guesses, pick which
+surface the maps should parent under, hit **Ingest** — every map is
+created inside the Action, bound to its media, and rowed neatly below
+the scene. Rows set to `(skip)` are left alone.
+
+The minutes of add-media-and-wire ritual at the start of every 3D comp,
+compressed into one pull.
+
 ## What's in the browser
 
 Everything Flame can make, tagged by origin:
@@ -133,6 +149,7 @@ switch.
 | **G + M** | gang with front+matte links |
 | **R**, multi-select | replicate picks onto every selected node until Esc |
 | **R + M** | replicate with front+matte links |
+| **I** on an Action | ingest: media → map-type table, Enter wires the lot |
 | **Enter** | commit the highlighted entry |
 | **↑ / ↓** | move the highlight |
 | **Esc / click away** | close (ends a gang/replicate — already committed) |
