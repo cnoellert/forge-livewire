@@ -29,9 +29,18 @@ commit and warn); `EXTRA_MATCHBOX_DIRS` config for Logik collections
 (belongs in the item-8 config file); auto-reindex on a timer or hook
 instead of manual `livewire.reindex()`.
 
-## 3. Action input capture → auto-wire into maps (BIG)
+## 3. Action input capture → auto-wire into maps — ✅ shipped 2026-07-30
 
-The flagship follow-up. Capture everything feeding an Action's
+Shipped as the **I (ingest) verb**: grab an Action in Batch, tap I,
+release → confirm table (media | feeder | map-type guess, parent-surface
+picker) → creates each map inside the Action, `assign_media`-bound,
+rowed below the scene. Scan rides `media_nodes` + per-node `.sockets`
+(full connection topology as a dict); guesses from feeder/clip naming
+conventions. Follow-ups: richer inference (channel metadata), matte/
+selective destinations, re-running ingest on an already-mapped Action
+(dedup). Original spec follows for reference.
+
+The original flagship brief: Capture everything feeding an Action's
 Batch-side inputs — beauty, normals, motion vectors, position, ID,
 mattes, whatever passes are noodled in — bring them into the Action as
 media, and plug each one into its proper destination: Diffuse Map,
