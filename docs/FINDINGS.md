@@ -156,6 +156,27 @@ panel you want redrawn.
   (smaller y). Chains/gangs in Action should build downward; Batch
   builds rightward.
 
+## Linux port (validated 2026-08-03, flame-01: Rocky 9.5 / Flame 2026.2.1)
+
+- The X11 backend (pure ctypes into `libX11`/`libXtst`, no python-xlib)
+  worked on first load inside Flame's embedded Python: `XOpenDisplay`
+  on Flame's `DISPLAY=:1`, `XQueryPointer` for the button mask,
+  `XQueryKeymap` + keysym→keycode for arm keys, 30 ms QTimer polling
+  identical to macOS.
+- **The Qt popup takes keyboard focus with plain `activateWindow()`**
+  on X11 — the macOS NSWindow `makeKeyAndOrderFront` dance is not
+  needed there.
+- All flame-API logic (`cursor_position`, surface detection, commits,
+  media wiring) is platform-neutral and behaved identically.
+- Deployment/iteration without sitting at the box: forge-bridge's HTTP
+  `/exec` on the Linux host, driven over ssh
+  (`curl -X POST 127.0.0.1:9999/exec -d '{"code": ...}'`) — same
+  probe-reload loop as the local MCP tools.
+- Open: does Linux Flame have the click-to-repaint quirk at all? (XTest
+  jiggle is wired as the nudge; delete it if redundant.) User prefs on
+  the test box exposed no `_user.*.batch` bins under
+  `/opt/Autodesk/user/*` — location TBD.
+
 ## Gesture classification plan
 
 - Socket grab: early-drag `cursor_position` near a node anchor with the

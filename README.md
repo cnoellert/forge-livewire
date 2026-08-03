@@ -18,25 +18,25 @@ implementation detail below.
 
 ## Requirements
 
-- Flame **2026.x on macOS** (developed and validated on 2026.2.2).
-  PySide6 ships inside Flame's Python; PyObjC does **not** — it is
-  vendored into the repo by a one-time bootstrap (below). No external
-  daemons, no Accessibility or Screen Recording permissions.
-- **Linux is not supported yet.** Input capture currently uses macOS Quartz
-  APIs; a Linux backend (XRecord/evdev) is possible but not written.
+- Flame **2026.x**, on **macOS** (developed on 2026.2.2) or **Rocky
+  Linux with X11** (validated on 2026.2.1 / Rocky 9.5). No external
+  daemons, no special permissions on either platform.
+- macOS additionally needs PyObjC vendored into the repo by a one-time
+  bootstrap (below). Linux needs nothing beyond the system X libraries
+  (`libX11`, `libXtst`) — the input backend is pure ctypes.
 
 ## Install
 
-One-time: vendor PyObjC into the repo using **Flame's own Python** (match
-the version dir to your Flame):
+**macOS only**, one-time: vendor PyObjC into the repo using **Flame's
+own Python** (match the version dir to your Flame):
 
 ```bash
 /opt/Autodesk/python/2026.2.2/bin/python3.11 -m pip install \
     --target /path/to/forge-livewire/vendor pyobjc-framework-Quartz
 ```
 
-Then symlink the hook into a Flame python hooks directory and restart
-Flame (or re-scan hooks):
+On either platform, symlink the hook into a Flame python hooks
+directory and restart Flame (or re-scan hooks):
 
 ```bash
 ln -s /path/to/forge-livewire/hooks/livewire_hook.py \

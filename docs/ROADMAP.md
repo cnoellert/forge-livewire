@@ -102,17 +102,18 @@ studio: one shared checkout + symlinked hook per workstation, version
 tag, and eventually a Logik portal submission (which effectively
 requires items 2 and 5 for feature parity with expectations).
 
-## 9. Linux backend
+## 9. Linux backend — ✅ shipped 2026-08-03
 
-All input capture is macOS Quartz today; Flame's big installed base is
-Rocky Linux. The polling architecture ports cleanly: X11
-`XQueryPointer` gives button state and `XQueryKeymap` key state — same
-30 ms main-thread poll, no event taps, no extra permissions
-(python-xlib, or ctypes straight into libX11 to avoid the dependency).
-`cursor_position` and all flame-API logic is platform-neutral already;
-isolate Quartz calls behind a small `hid.py` shim with mac/linux
-implementations. Needs a Linux Flame box to validate Wayland/XWayland
-behavior.
+`livewire/hid.py` shim: macOS Quartz vs pure-ctypes X11
+(`XQueryPointer` button mask, `XQueryKeymap` via keysym→keycode,
+XTest 1px jiggle as the repaint nudge). Validated in production use on
+flame-01 (Rocky 9.5, Flame 2026.2.1, X11 `:1`) — popup takes focus
+with plain `activateWindow`, no NSWindow-style trick needed. Remaining
+Linux follow-ups: confirm whether the click-to-repaint quirk exists
+there at all (if not, drop the XTest jiggle on Linux); `app_active()`
+is a stub (always True); flame-01's user bins/favorites came up empty —
+find where 2026.2.1 keeps user prefs on that box; Wayland untested
+(Flame ships X11).
 
 ## Known rough edges (small, unordered)
 
