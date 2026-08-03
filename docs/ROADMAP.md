@@ -109,9 +109,8 @@ requires items 2 and 5 for feature parity with expectations).
 XTest 1px jiggle as the repaint nudge). Validated in production use on
 flame-01 (Rocky 9.5, Flame 2026.2.1, X11 `:1`) — popup takes focus
 with plain `activateWindow`, no NSWindow-style trick needed. Remaining
-Linux follow-ups: confirm whether the click-to-repaint quirk exists
-there at all (if not, drop the XTest jiggle on Linux); `app_active()`
-is a stub (always True); flame-01's user bins/favorites came up empty —
+Linux follow-ups: repaint confirmed immediate (jiggle kept as
+insurance); `app_active()` is a stub (always True); flame-01's user bins/favorites came up empty —
 find where 2026.2.1 keeps user prefs on that box; Wayland untested
 (Flame ships X11).
 

@@ -172,10 +172,10 @@ panel you want redrawn.
   `/exec` on the Linux host, driven over ssh
   (`curl -X POST 127.0.0.1:9999/exec -d '{"code": ...}'`) — same
   probe-reload loop as the local MCP tools.
-- Open: does Linux Flame have the click-to-repaint quirk at all? (XTest
-  jiggle is wired as the nudge; delete it if redundant.) User prefs on
-  the test box exposed no `_user.*.batch` bins under
-  `/opt/Autodesk/user/*` — location TBD.
+- **No click-to-repaint quirk observed on Linux** — gang picks appear
+  immediately (user-confirmed). The XTest jiggle stays wired as cheap
+  insurance. User prefs on the test box exposed no `_user.*.batch`
+  bins under `/opt/Autodesk/user/*` — location TBD.
 
 ## Gesture classification plan
 
