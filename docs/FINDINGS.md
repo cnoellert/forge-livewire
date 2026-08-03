@@ -129,6 +129,13 @@ Live cursor position in **schematic space**, same coordinate system as
   next touches Flame (e.g. clicks the schematic). Callbacks that already
   run on the main thread (dialog handlers) should call the flame API
   directly; reserve idle marshaling for bridge/worker-thread entry.
+- **`hasattr()` is useless on Flame PyNodes** — missing attributes
+  resolve to `None` instead of raising, so `hasattr(node, anything)` is
+  always True and calling the result raises `TypeError: 'NoneType'
+  object is not callable`. This bit twice (PyCoNode `.delete()`, and an
+  `add_media` capability check that swallowed every multi-select commit
+  for four days). Check `node.type` or catch the TypeError; never
+  hasattr.
 - `detector._debug` is a 200-entry timestamped ring buffer of livewire
   events — first stop when behavior looks timing-dependent.
 
