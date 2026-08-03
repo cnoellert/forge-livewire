@@ -31,10 +31,10 @@ import flame
 # Additional shader directories (e.g. a studio Logik collection).
 EXTRA_MATCHBOX_DIRS = []
 
-_SEARCH_SETTINGS = os.path.expanduser(
-    "~/Library/Preferences/Autodesk/flame/search/search_settings.json")
-_USER_BIN_DIR = os.path.expanduser(
-    "~/Library/Preferences/Autodesk/flame/batch/pref")
+# Flame user prefs: macOS keeps them under ~/Library, Linux under
+# /opt/Autodesk/user/<user>. Scan every root that exists.
+_PREF_ROOTS = ([os.path.expanduser("~/Library/Preferences/Autodesk/flame")]
+               + sorted(glob.glob("/opt/Autodesk/user/*")))
 _NUKE_CACHE_GLOB = "/var/tmp/nuke-*/ofxplugincache/*.xml"
 
 _cache = None
@@ -66,9 +66,15 @@ def _stock_matchbox_dirs():
 def _search_meta():
     """name -> (weight, favorite); plus the set of used OFX labels."""
     meta, ofx = {}, set()
+    tools = []
+    for root in _PREF_ROOTS:
+        path = os.path.join(root, "search", "search_settings.json")
+        try:
+            with open(path) as f:
+                tools += json.load(f)["SearchSettings"]["Tools"]
+        except Exception:
+            continue
     try:
-        with open(_SEARCH_SETTINGS) as f:
-            tools = json.load(f)["SearchSettings"]["Tools"]
         for t in tools:
             name = t.get("Name")
             if not name:
@@ -140,11 +146,16 @@ def build(node_types):
             entries.append(_entry("%s - Matchbox" % stem, stem,
                                   "matchbox", path, meta))
 
-    for path in sorted(glob.glob(os.path.join(_USER_BIN_DIR,
-                                              "_user.*.batch"))):
-        stem = os.path.basename(path)[len("_user."):-len(".batch")]
-        entries.append(_entry("%s - User" % stem, stem,
-                              "userbin", path, meta))
+    for root in _PREF_ROOTS:
+        for path in sorted(glob.glob(os.path.join(root, "batch", "pref",
+                                                  "_user.*.batch"))):
+            stem = os.path.basename(path)[len("_user."):-len(".batch")]
+            key = ("userbin", stem)
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append(_entry("%s - User" % stem, stem,
+                                  "userbin", path, meta))
 
     for label in sorted(used_ofx | _nuke_ofx_labels() | _batch_ofx_labels()):
         entries.append(_entry("%s - OpenFX" % label, label,

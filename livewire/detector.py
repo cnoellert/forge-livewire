@@ -18,15 +18,10 @@ install() and uninstall() are safe to call from bridge worker threads.
 """
 
 import flame
-import Quartz
 from PySide6 import QtCore
 
-try:
-    import AppKit
-except Exception:
-    AppKit = None
-
 from . import browser
+from . import hid
 from . import indexer
 
 # Arm keys, polled only while a drag is in flight. In Batch, F routes the
@@ -37,14 +32,14 @@ from . import indexer
 # works; the new node(s) are linked as children (a gang = parent chain).
 # (Tab and backtick are taken: Tab tabs the schematic, backtick is
 # assigned in Action.)
-KEY_FRONT = 3    # macOS vkey: F
-KEY_MATTE = 46   # macOS vkey: M
-KEY_GANG = 5     # macOS vkey: G
-KEY_CHAINSEL = 15  # macOS vkey: R — replicate picks across the selection
-                   # (C is taken: compass in the Batch schematic)
-KEY_INGEST = 34    # macOS vkey: I — grab an Action, tap I: scan its
-                   # media inputs and open the map-ingest table
-                   # (A is taken: adds knots to node outputs mid-drag)
+# Keys by character; the hid shim maps them to platform codes.
+# Rejected: Tab (tabs the schematic), backtick (assigned in Action),
+# C (Batch compass), A (adds knots to node outputs mid-drag).
+KEY_FRONT = "f"
+KEY_MATTE = "m"
+KEY_GANG = "g"
+KEY_CHAINSEL = "r"   # replicate picks across the selection
+KEY_INGEST = "i"     # grab an Action, tap I: map-ingest table
 
 CHAIN_DX_BATCH = 200   # batch chains march right
 CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
@@ -171,57 +166,20 @@ def _action_types(action):
     return _act_types_cache
 
 
-def _app_active():
-    try:
-        return bool(AppKit.NSApp.isActive()) if AppKit else True
-    except Exception:
-        return True
-
-
 def _nudge_flame(nsloc=None):
     """Wake Flame's redraw after a commit made while the popup holds
     focus. Flame repaints when processing its own input events (classic
     redraw-after-input), so: pump Qt's dispatcher (input excluded), then
-    post a synthetic no-op mouse-move addressed to Flame's main window.
-    Aim it at nsloc — the drop point in bottom-left screen coords, i.e.
-    inside the schematic panel being used — since a center-of-window
-    move wakes the Batch panel but can miss Action's. (A bare
-    NSApplicationDefined post was not enough — tried and falsified.)"""
+    have the hid shim deliver a synthetic no-op input event aimed at
+    nsloc — the drop point — since panel repaint is hover-local (see
+    FINDINGS: the repaint escalation ladder)."""
     try:
-        from PySide6 import QtCore
         QtCore.QCoreApplication.sendPostedEvents()
         QtCore.QCoreApplication.processEvents(
             QtCore.QEventLoop.ExcludeUserInputEvents, 20)
     except Exception:
         pass
-    try:
-        import AppKit
-        app = AppKit.NSApplication.sharedApplication()
-        main = None
-        for w in app.windows():
-            try:
-                f = w.frame()
-                if w.isVisible() and (main is None
-                                      or f.size.width > main.frame().size.width):
-                    main = w
-            except Exception:
-                pass
-        if main is not None:
-            mtype = getattr(AppKit, "NSEventTypeMouseMoved",
-                            getattr(AppKit, "NSMouseMoved", 5))
-            f = main.frame()
-            if nsloc is not None:
-                loc = (nsloc[0] - float(f.origin.x),
-                       nsloc[1] - float(f.origin.y))
-            else:
-                loc = (f.size.width / 2.0, f.size.height / 2.0)
-            ev = (AppKit.NSEvent.
-                  mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure_(
-                      mtype, loc, 0, 0.0, main.windowNumber(), None,
-                      0, 0, 0.0))
-            app.postEvent_atStart_(ev, False)
-    except Exception as e:
-        _log("nudge failed: %r" % e)
+    hid.nudge(nsloc)
 
 
 def _pick(names, needle):
@@ -463,13 +421,8 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
         else:
             chains = [{"source": source, "cp": cp, "first": True}]
 
-        state = {"nsloc": None}
-        try:
-            import AppKit
-            p = AppKit.NSEvent.mouseLocation()  # cursor is at the drop
-            state["nsloc"] = (float(p.x), float(p.y))  # point right now
-        except Exception:
-            pass
+        # cursor is at the drop point right now
+        state = {"nsloc": hid.cursor_loc()}
 
         def on_commit(entry, sock):
             _log("on_commit called: %s (mode=%s, chains=%d)"
@@ -576,8 +529,7 @@ def _tick():
     global _ingest, _bat_types
     global _bat_map, _act_map, _act_name, _act_obj, _surface, _source, err
     try:
-        st = Quartz.kCGEventSourceStateCombinedSessionState
-        btn = 1 if Quartz.CGEventSourceButtonState(st, 0) else 0
+        btn = 1 if hid.button_down() else 0
         if btn and not _btn:
             _pairs = []
             _armed = False
@@ -588,7 +540,7 @@ def _tick():
             _ingest = False
             _source = None
             _surface = None
-            if _app_active():
+            if hid.app_active():
                 _bat_types = {}
                 _bat_map = _snapshot(_attr(flame.batch.nodes), _bat_types)
                 _act_obj = _current_action()
@@ -609,11 +561,11 @@ def _tick():
             if not _pairs or pair != _pairs[-1]:
                 _pairs.append(pair)
             if _bat_map or _act_map:
-                f_down = Quartz.CGEventSourceKeyState(st, KEY_FRONT)
-                m_down = Quartz.CGEventSourceKeyState(st, KEY_MATTE)
-                g_down = Quartz.CGEventSourceKeyState(st, KEY_GANG)
-                c_down = Quartz.CGEventSourceKeyState(st, KEY_CHAINSEL)
-                a_down = Quartz.CGEventSourceKeyState(st, KEY_INGEST)
+                f_down = hid.key_down(KEY_FRONT)
+                m_down = hid.key_down(KEY_MATTE)
+                g_down = hid.key_down(KEY_GANG)
+                c_down = hid.key_down(KEY_CHAINSEL)
+                a_down = hid.key_down(KEY_INGEST)
                 if f_down or m_down or g_down or c_down or a_down:
                     if not _armed:
                         _armed = True
@@ -635,13 +587,7 @@ def _tick():
                     src_name = _source["name"]
 
                     def open_mapper(src_name=src_name):
-                        nsloc = None
-                        try:
-                            import AppKit
-                            p = AppKit.NSEvent.mouseLocation()
-                            nsloc = (float(p.x), float(p.y))
-                        except Exception:
-                            pass
+                        nsloc = hid.cursor_loc()
                         from . import actionmaps
                         actionmaps.show_mapper(
                             src_name,

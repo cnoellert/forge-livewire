@@ -290,16 +290,19 @@ class NodeBrowser(QtWidgets.QWidget):
 
 
 def _force_key(w):
-    """Make the popup the macOS key window; Flame's native fullscreen
-    window otherwise keeps keyboard focus and typing never reaches Qt."""
-    try:
-        import objc
-        nsview = objc.objc_object(c_void_p=int(w.winId()))
-        nswin = nsview.window()
-        if nswin is not None:
-            nswin.makeKeyAndOrderFront_(None)
-    except Exception as e:
-        print("[livewire] makeKey failed: %r" % e)
+    """Make the popup the key window; Flame's native fullscreen window
+    otherwise keeps keyboard focus and typing never reaches Qt. The
+    NSWindow dance is macOS-only; on X11 activateWindow suffices."""
+    import sys
+    if sys.platform == "darwin":
+        try:
+            import objc
+            nsview = objc.objc_object(c_void_p=int(w.winId()))
+            nswin = nsview.window()
+            if nswin is not None:
+                nswin.makeKeyAndOrderFront_(None)
+        except Exception as e:
+            print("[livewire] makeKey failed: %r" % e)
     w.raise_()
     w.activateWindow()
     edit = getattr(w, "_edit", None)
