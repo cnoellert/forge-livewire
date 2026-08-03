@@ -44,6 +44,8 @@ KEY_INGEST = "i"     # grab an Action, tap I: map-ingest table
 CHAIN_DX_BATCH = 200   # batch chains march right
 CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
                        # parents; smaller y is lower in action space)
+MEDIA_DX = 170         # media knots sit in line with their feeder,
+                       # this far to its right
 
 VERBOSE = False  # arm/commit chatter in the shell; errors always print
 
@@ -317,6 +319,13 @@ def _commit_batch(entry, out_socket, cp, source, mode):
                     _log("add_media failed: %r" % e)
                     break
                 exsrc = flame.batch.get_node(ex["name"])
+                try:
+                    # park the knot in line with its feeder, not where
+                    # Flame's auto-placement scatters it
+                    media.pos_x = int(float(_attr(exsrc.pos_x)) + MEDIA_DX)
+                    media.pos_y = int(float(_attr(exsrc.pos_y)))
+                except Exception:
+                    pass
                 exouts = ex.get("sockets") or []
                 img_out = ("Result" if "Result" in exouts
                            else (exouts[0] if exouts else None))
