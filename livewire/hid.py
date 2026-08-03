@@ -47,6 +47,9 @@ if DARWIN:
         except Exception:
             return None
 
+    def force_focus(window_id):
+        pass  # macOS focus is the NSWindow makeKey dance in browser.py
+
     def nudge(loc=None):
         """Post a synthetic mouse-move to Flame's main window, aimed at
         loc (native screen coords) so the right panel repaints."""
@@ -181,6 +184,21 @@ else:
                 ctypes.c_void_p(_dpy), 1, 0, 0)
             _xtst.XTestFakeRelativeMotionEvent(
                 ctypes.c_void_p(_dpy), -1, 0, 0)
+            _x11.XFlush(ctypes.c_void_p(_dpy))
+        except Exception:
+            pass
+
+    def force_focus(window_id):
+        """Point X input focus at the popup. Qt's activateWindow alone
+        doesn't reliably win keyboard focus from Flame's fullscreen
+        window under the WMs that ship with Rocky."""
+        if not _init():
+            return
+        try:
+            _x11.XSetInputFocus(ctypes.c_void_p(_dpy),
+                                ctypes.c_ulong(window_id),
+                                2,   # RevertToParent
+                                0)   # CurrentTime
             _x11.XFlush(ctypes.c_void_p(_dpy))
         except Exception:
             pass

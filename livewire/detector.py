@@ -307,7 +307,14 @@ def _commit_batch(entry, out_socket, cp, source, mode):
                                      else (outs[0] if outs else None))
             _connect(src, use_out, new, in_sock)
         extras = source.get("extra") or []
-        if extras and hasattr(new, "add_media"):
+        # NB: hasattr() is useless on Flame PyNodes — missing attributes
+        # resolve to None instead of raising, so hasattr(new,
+        # "add_media") is True for EVERY node. Check the node type.
+        try:
+            is_action_node = str(_attr(new.type)) == "Action"
+        except Exception:
+            is_action_node = False
+        if extras and is_action_node:
             # Action: one media layer per additional selected node,
             # wired in selection order. add_media() returns the Action
             # Media batch node (ins Front/Matte); Flame auto-places it

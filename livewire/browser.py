@@ -303,6 +303,9 @@ def _force_key(w):
                 nswin.makeKeyAndOrderFront_(None)
         except Exception as e:
             print("[livewire] makeKey failed: %r" % e)
+    else:
+        from . import hid
+        hid.force_focus(int(w.winId()))
     w.raise_()
     w.activateWindow()
     edit = getattr(w, "_edit", None)
