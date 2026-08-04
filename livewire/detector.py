@@ -644,6 +644,15 @@ def _decide_surface():
     # selected nodes become additional sources (back pair, and beyond
     # once nodes with more input pairs are supported).
     if src is not None:
+        try:
+            ax, ay = next((x, y) for (n, x, y) in _bat_map
+                          if n == src["name"])
+            offs = [(round(sx - ax), round(sy - ay))
+                    for (sx, sy) in bat_samples[:3]]
+            _log("grab offsets vs %s anchor: %s (dist=%s)"
+                 % (src["name"], offs, src.get("dist")))
+        except Exception:
+            pass
         sel = _selection_names()
         _log("selection at arm: %s (grab=%s)" % (sel, src["name"]))
         if len(sel) >= 2 and src["name"] in sel:
