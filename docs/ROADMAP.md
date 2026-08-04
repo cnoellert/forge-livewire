@@ -123,6 +123,36 @@ insurance); `app_active()` is a stub (always True); flame-01's user bins/favorit
 find where 2026.2.1 keeps user prefs on that box; Wayland untested
 (Flame ships X11).
 
+## 10. Channel fan-out: multichannel EXR / multitrack → Action & Cryptomatte — NEXT UP
+
+The missing half of the fan-out grammar: converge maps N selected
+nodes → N inputs; this maps the M output sockets of ONE node → M
+inputs. No new arm key — F + target dispatch, as ever:
+
+- **Multi-output clip + pick Action**: one media per channel output,
+  wired in socket order, crypto channels EXCLUDED by pattern
+  (`Crypto*` families + numbered sub-layers). Header announces e.g.
+  "fan 12 channels (3 crypto skipped)".
+- **Multi-output clip + pick Cryptomatte**: the inverse filter — only
+  the crypto MAT/LAYER channels wire in. One CRYPTO_PATTERNS table
+  serves both directions (edit point for studio naming schemes).
+- Single-input picks keep today's behavior (socket combo etc.).
+
+Probe list (blocked on a free Flame + a real multichannel EXR):
+1. How a multichannel EXR clip presents in Batch — output socket per
+   channel? naming? colour/matte pairs per layer?
+2. The Cryptomatte node: exact type name, input sockets, how many
+   crypto layers it expects, whether the manifest path needs setting.
+3. Multitrack clips and *groups* ("group to Action") — same socket
+   mechanism or a different exposure?
+4. Whether media wiring from a named channel socket
+   (`connect_nodes(clip, "N", media, "Front")`) behaves like Result.
+
+Follow-up variant: connect-to-EXISTING Cryptomatte node (select EXR +
+existing node, wire without the browser) — a new gesture class,
+kin to item 6's drop-on-target; design after the create-and-wire
+version proves the filtering.
+
 ## Known rough edges (small, unordered)
 
 - Armed release *onto* a node's input completes the native connection
