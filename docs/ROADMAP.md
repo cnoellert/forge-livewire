@@ -151,9 +151,20 @@ HTTP server inside it died during a hook rescan, which reads
 identically to a host crash from outside (connection refused).
 Diagnostic rule that came out of it: **bridge-unreachable does not
 mean Flame-dead** — confirm with the operator or the process table
-before writing a crash narrative. In-Flame validation of the XI2
-reader remains the open step, to be run supervised with the operator
-ready to kill it. Other open Linux items: `app_active()` is a stub
+before writing a crash narrative.
+
+**In-Flame result (2026-08-04): the gesture engine passed, the
+transport failed.** With XI 2.2 negotiated (2.0 suppresses raw events
+during Flame's drag grabs — that cost one debugging round), a full
+replicate gang committed 9 wired nodes on Linux. But **Shift broke
+again**, and stopping the reader fixed it instantly — the second
+independent X mechanism with the same symptom. Verdict: any X-protocol
+input observation inside Flame's process disturbs this stack; the X
+road is closed. **Next and final design: evdev** — read
+`/dev/input/event*` on the reader thread (kernel interface, zero X
+involvement, structurally unable to touch X clients). Blocked on a
+one-time permission: `sudo usermod -aG input <user>` + relogin.
+Standalone-first validation applies as ever. Other open Linux items: `app_active()` is a stub
 (always True); flame-01's user bins/favorites came up empty —
 find where 2026.2.1 keeps user prefs on that box; Wayland untested
 (Flame ships X11).

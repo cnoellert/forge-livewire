@@ -197,8 +197,24 @@ panel you want redrawn.
   `XISelectEvents` on root for raw button/key, drained via select() on
   the connection fd. Outside Flame it captured all arm keys
   (press+release), button-1 held, and arm-keys-during-drag — the full
-  gesture vocabulary — with zero errors. In-Flame validation remains
-  the open step.
+  gesture vocabulary — with zero errors.
+- **XI 2.0 suppresses raw events during pointer grabs** — and Flame
+  grabs the pointer for every noodle drag, so button releases vanished
+  mid-gesture (stuck-down state, browser never opened). Negotiating
+  **XI 2.2** fixes delivery-during-grabs; with it, the full gesture
+  engine worked in-Flame on Linux (a 3-chain replicate gang committed
+  9 wired nodes flawlessly).
+- **REFUTED (the hard way, 2026-08-04): even passive XI2 raw-event
+  selection breaks Flame's Shift handling.** Second independent
+  mechanism, same symptom, same instant recovery when the reader
+  stops. Combined with the polling result, the conclusion is: **any
+  X-protocol input observation from inside Flame's process disturbs
+  this stack** (Rocky 9.5 / Flame 2026.2.1). Mechanism unknown; both
+  bisects were clean. The X road is closed.
+- **The remaining Linux design is evdev** (`/dev/input/event*`):
+  kernel-level, no X protocol at all, structurally incapable of
+  interacting with X clients. Requires read access (input group
+  membership — a one-time `usermod -aG input <user>` + relogin).
 - **Bridge-unreachable ≠ Flame-dead.** The forge-bridge HTTP server
   can die inside a healthy, running Flame (observed after a python
   hook rescan: port 9999 unbound, Flame fine, operator-confirmed).
