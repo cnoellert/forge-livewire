@@ -87,21 +87,38 @@ class Reader(object):
 
     def _loop(self):
         fds = self._open_all()
-        if not fds:
-            raise RuntimeError("no readable /dev/input/event* devices "
-                               "(input group / ACL missing?)")
+        # NB: do not require devices at start, and RESCAN periodically —
+        # PCoIP (and USB hotplug) destroy and recreate event nodes on
+        # reconnect, so input can migrate to devices that did not exist
+        # when we started. Missing this cost a debugging session.
+        idle = 0
         try:
             while not self._stop.is_set():
                 ready, _, _ = select.select(list(fds), [], [], 0.05)
+                if not ready:
+                    idle += 1
+                    if idle >= 40:  # ~2 s quiet: look for new devices
+                        idle = 0
+                        known = set(fds.values())
+                        for path in glob.glob("/dev/input/event*"):
+                            if path in known:
+                                continue
+                            try:
+                                fds[os.open(path,
+                                            os.O_RDONLY
+                                            | os.O_NONBLOCK)] = path
+                            except OSError:
+                                pass
+                    continue
+                idle = 0
                 for fd in ready:
                     try:
                         buf = os.read(fd, _EV_SIZE * 64)
                     except OSError:
-                        # device unplugged; drop it, keep going
+                        # device destroyed; drop it — the rescan will
+                        # pick up its replacement
                         os.close(fd)
                         fds.pop(fd, None)
-                        if not fds:
-                            raise RuntimeError("all input devices lost")
                         continue
                     for off in range(0, len(buf) - _EV_SIZE + 1,
                                      _EV_SIZE):
