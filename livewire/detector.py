@@ -50,9 +50,17 @@ MEDIA_DY = 150         # channel fan-out stacks medias this far apart
 CRYPTO_PAT = "crypto"  # channel names containing this (case-insens)
                        # are crypto layers: excluded from Action
                        # fan-out, exclusively used by CryptoMatte
-EXPANDED_STEP = 55     # est. schematic units per socket row: expanded
-                       # multichannel clips match grabs along a vertical
-                       # segment of n_sockets * this, not just the anchor
+EXPANDED_STEP = 40     # schematic units per socket row for the expanded
+                       # -clip grab segment (calibrated 37.5; padded)
+
+# Socket-inference geometry, calibrated 2026-08-04 against a 30-tab
+# expanded EXR and a Comp (see FINDINGS). Sockets stack down the right
+# edge; body grabs snap to the anchor (dx~0) so dx gates confidence.
+SOCK_STD_STEP = 21.0   # standard nodes: per-socket step, centered
+SOCK_STD_XMIN = 15.0   # min dx to call it a socket grab (grabs ~+40)
+SOCK_EXR_STEP = 37.5   # expanded clips: per-tab step
+SOCK_EXR_PAD = 46.6    # top tab sits this far below the centered model
+SOCK_EXR_XMIN = 60.0   # expanded-clip tab column is at dx ~+112
 
 VERBOSE = False  # arm/commit chatter in the shell; errors always print
 
@@ -615,6 +623,36 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
     QtCore.QTimer.singleShot(SETTLE_MS, show)
 
 
+def _infer_socket(outs, anchor, samples, meta):
+    """Which output socket was grabbed, from the grab point's offset to
+    the node anchor. Returns a socket name or None (not confident)."""
+    if len(outs) < 2 or not samples:
+        return None
+    pts = samples[:3]
+    sx = sorted(p[0] for p in pts)[len(pts) // 2]
+    sy = sorted(p[1] for p in pts)[len(pts) // 2]
+    dx = sx - anchor[0]
+    dy = sy - anchor[1]
+    if meta and not meta[1]:  # expanded multichannel clip
+        visible = [o for o in outs if not o.endswith("_alpha")]
+        step = SOCK_EXR_STEP
+        top = (len(visible) - 1) / 2.0 * step - SOCK_EXR_PAD
+        if dx < SOCK_EXR_XMIN:
+            return None
+    else:
+        visible = outs
+        step = SOCK_STD_STEP
+        top = (len(visible) - 1) / 2.0 * step
+        if dx < SOCK_STD_XMIN:
+            return None
+    idx = int(round((top - dy) / step))
+    if not (0 <= idx < len(visible)):
+        return None
+    if abs((top - dy) - idx * step) > step * 0.5 + 1:
+        return None
+    return visible[idx]
+
+
 def _decide_surface():
     """Called once, at arm time. Returns (surface, source).
 
@@ -649,8 +687,12 @@ def _decide_surface():
                           if n == src["name"])
             offs = [(round(sx - ax), round(sy - ay))
                     for (sx, sy) in bat_samples[:3]]
-            _log("grab offsets vs %s anchor: %s (dist=%s)"
-                 % (src["name"], offs, src.get("dist")))
+            gs = _infer_socket(src.get("sockets") or [], (ax, ay),
+                               bat_samples, _bat_meta.get(src["name"]))
+            if gs:
+                src["grab_socket"] = gs
+            _log("grab offsets vs %s anchor: %s -> socket %s"
+                 % (src["name"], offs, gs))
         except Exception:
             pass
         sel = _selection_names()

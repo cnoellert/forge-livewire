@@ -160,8 +160,12 @@ class NodeBrowser(QtWidgets.QWidget):
             if len(sockets) > 1 and kind != "action" and mode != "front_matte":
                 self._socket_combo = QtWidgets.QComboBox(self)
                 self._socket_combo.addItems(sockets)
-                default = None
-                if mode == "matte":
+                # the socket the artist actually grabbed wins; then the
+                # mode heuristics; then Result
+                default = source.get("grab_socket")
+                if default not in sockets:
+                    default = None
+                if default is None and mode == "matte":
                     default = next((s for s in sockets
                                     if "matte" in s.lower()), None)
                 if default is None and "Result" in sockets:
