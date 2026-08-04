@@ -335,6 +335,15 @@ class NodeBrowser(QtWidgets.QWidget):
     def closeEvent(self, ev):
         if self in _open:
             _open.remove(self)
+        # hand keyboard focus back — on X11 a closed popup can otherwise
+        # leave X input focus on a destroyed window
+        import sys
+        if sys.platform != "darwin":
+            try:
+                from . import hid
+                hid.release_focus()
+            except Exception:
+                pass
         super().closeEvent(ev)
 
 

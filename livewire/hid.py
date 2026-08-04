@@ -50,6 +50,9 @@ if DARWIN:
     def force_focus(window_id):
         pass  # macOS focus is the NSWindow makeKey dance in browser.py
 
+    def release_focus():
+        pass  # macOS returns focus to Flame on its own
+
     def nudge(loc=None):
         """Post a synthetic mouse-move to Flame's main window, aimed at
         loc (native screen coords) so the right panel repaints."""
@@ -188,17 +191,45 @@ else:
         except Exception:
             pass
 
+    _prev_focus = None
+
     def force_focus(window_id):
-        """Point X input focus at the popup. Qt's activateWindow alone
-        doesn't reliably win keyboard focus from Flame's fullscreen
-        window under the WMs that ship with Rocky."""
+        """Point X input focus at the popup, remembering what had it.
+        Qt's activateWindow alone doesn't reliably win keyboard focus
+        from Flame's fullscreen window under the WMs on Rocky."""
+        global _prev_focus
         if not _init():
             return
         try:
+            if _prev_focus is None:
+                w = ctypes.c_ulong()
+                rev = ctypes.c_int()
+                _x11.XGetInputFocus(ctypes.c_void_p(_dpy),
+                                    ctypes.byref(w), ctypes.byref(rev))
+                if w.value > 1:      # not None/PointerRoot
+                    _prev_focus = w.value
             _x11.XSetInputFocus(ctypes.c_void_p(_dpy),
                                 ctypes.c_ulong(window_id),
                                 2,   # RevertToParent
                                 0)   # CurrentTime
+            _x11.XFlush(ctypes.c_void_p(_dpy))
+        except Exception:
+            pass
+
+    def release_focus():
+        """Hand keyboard focus back to whoever had it before the popup.
+        Without this, closing a popup can leave X focus pointing at a
+        destroyed window — keys (and modifiers) then go nowhere."""
+        global _prev_focus
+        if not _init():
+            return
+        target = _prev_focus
+        _prev_focus = None
+        try:
+            _x11.XSetInputFocus(ctypes.c_void_p(_dpy),
+                                ctypes.c_ulong(target) if target
+                                else ctypes.c_ulong(1),  # PointerRoot
+                                2, 0)
             _x11.XFlush(ctypes.c_void_p(_dpy))
         except Exception:
             pass
