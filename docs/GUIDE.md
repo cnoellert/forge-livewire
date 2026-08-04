@@ -11,16 +11,22 @@ Ctrl+Z works exactly as if you had built it by hand.
 
 ## Setup (once)
 
+macOS (once per Flame generation — 2026 is py311, 2027 is py313):
+
 ```bash
 /opt/Autodesk/python/2026.2.2/bin/python3.11 -m pip install \
-    --target /path/to/forge-livewire/vendor pyobjc-framework-Quartz
+    --target /path/to/forge-livewire/vendor/py311 pyobjc-framework-Quartz
+```
 
+Both platforms (Linux needs nothing else):
+
+```bash
 ln -s /path/to/forge-livewire/hooks/livewire_hook.py \
       /opt/Autodesk/shared/python/livewire_hook.py
 ```
 
 Restart Flame (or rescan python hooks). That's it — livewire is now
-armed in every session. macOS only for now.
+armed in every session, macOS and Rocky Linux (X11) alike.
 
 ## The gesture
 
