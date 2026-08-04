@@ -190,8 +190,17 @@ class NodeBrowser(QtWidgets.QWidget):
                 if default not in sockets:
                     default = None
                 if default is None and mode == "matte":
-                    default = next((s for s in sockets
-                                    if "matte" in s.lower()), None)
+                    # the image output's _alpha sibling is the matte on
+                    # multichannel clips; never a Cryptomatte_* layer
+                    img = ("Result" if "Result" in sockets
+                           else (sockets[0] if sockets else None))
+                    sib = (img + "_alpha") if img else None
+                    if sib in sockets:
+                        default = sib
+                    else:
+                        default = next(
+                            (s for s in sockets if "matte" in s.lower()
+                             and "crypto" not in s.lower()), None)
                 if default is None and "Result" in sockets:
                     default = "Result"
                 if default:

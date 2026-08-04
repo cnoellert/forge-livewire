@@ -223,6 +223,21 @@ def _pick(names, needle):
     return None
 
 
+def _matte_for(outs, img_out):
+    """The matte output that belongs with img_out: its `_alpha` sibling
+    on multichannel clips, else a real matte socket. Never a crypto
+    layer — `Cryptomatte_MAT` contains "matte" but is not one."""
+    if img_out:
+        sib = img_out + "_alpha"
+        if sib in outs:
+            return sib
+    for o in outs:
+        low = o.lower()
+        if "matte" in low and CRYPTO_PAT not in low:
+            return o
+    return None
+
+
 def _pick_in(ins, image=True, back=False):
     """Pick an input socket by role: image vs matte, front-pair vs
     back-pair ('Front'/'Matte' vs 'Back'/'Back Matte')."""
@@ -407,11 +422,11 @@ def _commit_batch(entry, out_socket, cp, source, mode):
                     and _wire_channels_to_crypto(new, src, outs)):
                 return out_node
         if mode == "front_matte":
-            front_out = ("Result" if "Result" in outs
-                         else (outs[0] if outs else None))
+            front_out = out_socket or ("Result" if "Result" in outs
+                                       else (outs[0] if outs else None))
             # only wire a matte when the source really has a matte
             # output — never route the image output into a Matte input
-            matte_out = _pick(outs, "matte")
+            matte_out = _matte_for(outs, front_out)
             front_in = _pick_in(ins, image=True) or (ins[0] if ins else None)
             matte_in = _pick_in(ins, image=False)
             _connect(src, front_out, new, front_in)
@@ -422,8 +437,10 @@ def _commit_batch(entry, out_socket, cp, source, mode):
                        or (ins[0] if ins else None))
             # Batch connect_nodes has no 2-arg form: always resolve an
             # output socket (chained gang picks arrive without one).
-            use_out = out_socket or ("Result" if "Result" in outs
-                                     else (outs[0] if outs else None))
+            img_out = ("Result" if "Result" in outs
+                       else (outs[0] if outs else None))
+            use_out = out_socket or (_matte_for(outs, img_out)
+                                     if mode == "matte" else img_out)
             _connect(src, use_out, new, in_sock)
         extras = source.get("extra") or []
         # NB: hasattr() is useless on Flame PyNodes — missing attributes
@@ -481,7 +498,7 @@ def _commit_batch(entry, out_socket, cp, source, mode):
                 _connect(exsrc, img_out, new, back_in)
                 if mode == "front_matte":
                     back_matte_in = _pick_in(ins, image=False, back=True)
-                    matte_out = _pick(exouts, "matte")
+                    matte_out = _matte_for(exouts, img_out)
                     if back_matte_in and matte_out:
                         _connect(exsrc, matte_out, new, back_matte_in)
     return out_node
