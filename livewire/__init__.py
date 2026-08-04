@@ -6,12 +6,15 @@ import sys
 __version__ = "0.10.0"
 
 # Flame's embedded Python does not ship PyObjC; use the vendored copy
-# (see README "Install" for the one-time bootstrap that creates it).
+# matching THIS interpreter (vendor/py311 for Flame 2026, vendor/py313
+# for 2027, ... — compiled extensions are not cross-version). See
+# README "Install" for the one-time bootstrap per Flame generation.
 try:
     import Quartz  # noqa: F401
 except ImportError:
-    _vendor = os.path.join(os.path.dirname(os.path.dirname(
-        os.path.realpath(__file__))), "vendor")
+    _vendor = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "vendor", "py%d%d" % sys.version_info[:2])
     if os.path.isdir(_vendor) and _vendor not in sys.path:
         sys.path.insert(0, _vendor)
 

@@ -27,12 +27,14 @@ implementation detail below.
 
 ## Install
 
-**macOS only**, one-time: vendor PyObjC into the repo using **Flame's
-own Python** (match the version dir to your Flame):
+**macOS only**, one-time **per Flame generation**: vendor PyObjC into
+the repo using **that Flame's own Python**, targeting a directory named
+for its python version (compiled extensions don't cross versions —
+Flame 2026 is py311, Flame 2027 is py313):
 
 ```bash
 /opt/Autodesk/python/2026.2.2/bin/python3.11 -m pip install \
-    --target /path/to/forge-livewire/vendor pyobjc-framework-Quartz
+    --target /path/to/forge-livewire/vendor/py311 pyobjc-framework-Quartz
 ```
 
 On either platform, symlink the hook into a Flame python hooks
