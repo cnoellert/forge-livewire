@@ -50,6 +50,9 @@ MEDIA_DY = 150         # channel fan-out stacks medias this far apart
 CRYPTO_PAT = "crypto"  # channel names containing this (case-insens)
                        # are crypto layers: excluded from Action
                        # fan-out, exclusively used by CryptoMatte
+EXPANDED_STEP = 55     # est. schematic units per socket row: expanded
+                       # multichannel clips match grabs along a vertical
+                       # segment of n_sockets * this, not just the anchor
 
 VERBOSE = False  # arm/commit chatter in the shell; errors always print
 
@@ -69,6 +72,7 @@ _ingest = False        # A tapped: Action map-ingest table
 _pairs = []            # [(batch_cpos, action_cpos|None), ...] this drag
 _bat_map = []          # [(name, x, y)] batch nodes, snapshotted at press
 _bat_types = {}        # name -> node type, same snapshot
+_bat_meta = {}         # clip name -> (n_sockets, collapsed), same snapshot
 _act_map = []          # [(name, x, y)] open action's nodes
 _act_name = None       # name of the current Action node, if any
 _act_obj = None        # its PyActionNode, held for the drag only
@@ -134,15 +138,30 @@ def _output_sockets(name):
         return []
 
 
-def _find_source(samples, node_map, with_sockets):
-    """Nearest node anchor to the early drag samples, within GRAB_RADIUS."""
+def _find_source(samples, node_map, with_sockets, meta=None):
+    """Nearest node to the early drag samples, within GRAB_RADIUS.
+
+    Nodes with meta (expanded multichannel clips) match along a vertical
+    segment sized by their socket count — their grab surface is a tall
+    column, not a point."""
     early = samples[:EARLY_SAMPLES]
     if not early or not node_map:
         return None
     best = None
     for (name, x, y) in node_map:
+        seg = 0.0
+        m = (meta or {}).get(name)
+        if m and not m[1]:  # expanded
+            seg = (m[0] + 1) * EXPANDED_STEP
         for (sx, sy) in early:
-            d = ((sx - x) ** 2 + (sy - y) ** 2) ** 0.5
+            if seg:
+                if (y - seg) <= sy <= (y + seg):
+                    dy = 0.0
+                else:
+                    dy = min(abs(sy - (y - seg)), abs(sy - (y + seg)))
+                d = ((sx - x) ** 2 + dy ** 2) ** 0.5
+            else:
+                d = ((sx - x) ** 2 + (sy - y) ** 2) ** 0.5
             if best is None or d < best[0]:
                 best = (d, name)
     if best is None or best[0] > GRAB_RADIUS:
@@ -318,28 +337,39 @@ def _wire_channels_to_action(new, src, outs):
 
 
 def _wire_channels_to_crypto(new, src, outs):
-    """Multichannel clip → CryptoMatte: rgba to Front, the chosen
-    crypto family's numbered rank layers to uCryptoNNrgb/a."""
+    """Multichannel clip → CryptoMatte: one CryptoMatte node per crypto
+    family (MAT, NODE, ...), each with rgba to Front and its family's
+    numbered rank layers to uCryptoNNrgb/a. The picked node takes the
+    first family; extra families get their own node stacked below."""
     import re
     fams = sorted({m.group(1) for o in outs
                    for m in [re.match(r"(.*%s.*?)(\d{2})$" % CRYPTO_PAT,
                                       o, re.I)] if m})
     if not fams:
         return False
-    fam = next((f for f in fams if "mat" in f.lower()), fams[0])
-    if len(fams) > 1:
-        _log("crypto families %s — wiring %s (others skipped)"
-             % (fams, fam))
-    if "rgba" in outs:
-        _connect(src, "rgba", new, "Front")
-    for i in range(3):
-        cname = "%s%02d" % (fam, i)
-        if cname not in outs:
-            continue
-        _connect(src, cname, new, "uCrypto%02drgb" % i)
-        aname = cname + "_alpha"
-        if aname in outs:
-            _connect(src, aname, new, "uCrypto%02da" % i)
+    fams.sort(key=lambda f: (0 if "mat" in f.lower() else 1, f))
+    base_x = float(_attr(new.pos_x))
+    base_y = float(_attr(new.pos_y))
+    node = new
+    for i, fam in enumerate(fams):
+        if i > 0:
+            node = flame.batch.create_node("CryptoMatte")
+            try:
+                node.pos_x = int(base_x)
+                node.pos_y = int(base_y - 220 * i)
+            except Exception:
+                pass
+        if "rgba" in outs:
+            _connect(src, "rgba", node, "Front")
+        for r in range(3):
+            cname = "%s%02d" % (fam, r)
+            if cname not in outs:
+                continue
+            _connect(src, cname, node, "uCrypto%02drgb" % r)
+            aname = cname + "_alpha"
+            if aname in outs:
+                _connect(src, aname, node, "uCrypto%02da" % r)
+        _log("cryptomatte wired: %s" % fam)
     return True
 
 
@@ -608,7 +638,8 @@ def _decide_surface():
         act_moving = len(set(act_samples)) >= 2
         if src is not None or act_moving:
             return {"kind": "action", "action": _act_name}, src
-    src = _find_source(bat_samples, _bat_map, with_sockets=True)
+    src = _find_source(bat_samples, _bat_map, with_sockets=True,
+                       meta=_bat_meta)
     # Deliberate multi-select including the grabbed node: the other
     # selected nodes become additional sources (back pair, and beyond
     # once nodes with more input pairs are supported).
@@ -623,7 +654,7 @@ def _decide_surface():
 
 def _tick():
     global _btn, _armed, _to_front, _to_matte, _gang, _chain_sel, _pairs
-    global _ingest, _bat_types
+    global _ingest, _bat_types, _bat_meta
     global _bat_map, _act_map, _act_name, _act_obj, _surface, _source, err
     try:
         btn = 1 if hid.button_down() else 0
@@ -640,6 +671,22 @@ def _tick():
             if hid.app_active():
                 _bat_types = {}
                 _bat_map = _snapshot(_attr(flame.batch.nodes), _bat_types)
+                _bat_meta = {}
+                for n in _attr(flame.batch.nodes):
+                    try:
+                        if str(_attr(n.type)) != "Clip":
+                            continue
+                        nsock = len(_attr(n.output_sockets))
+                        if nsock <= 2:
+                            continue
+                        col = True
+                        try:
+                            col = bool(_attr(n.collapsed))
+                        except Exception:
+                            pass
+                        _bat_meta[str(_attr(n.name))] = (nsock, col)
+                    except Exception:
+                        pass
                 _act_obj = _current_action()
                 if _act_obj is not None:
                     _act_name = str(_attr(_act_obj.name))
