@@ -11,25 +11,26 @@ Everything OS-specific lives here. The detector talks only to:
 
 macOS: Quartz event-source state polling + an NSMouseMoved posted to
 Flame's main window (in-process, no permissions).
-Linux/X11: XQueryPointer / XQueryKeymap via ctypes into libX11 — READ
-ONLY. The X11 side never injects input and never touches focus; both
-were tried and both caused problems (see the note in the linux
-branch). No dependencies beyond libX11.
+Linux/X11: event-driven — an XInput2 raw-event reader thread (xi2.py)
+owning its own connection; Flame's threads make zero X calls. Strictly
+hands-off otherwise: no synthetic input, no focus calls. start()/stop()
+manage the reader; both are no-ops on macOS.
 """
 
 import sys
 
 DARWIN = sys.platform == "darwin"
 
-# Linux/X11 is DISABLED pending a redesign (2026-08-04). The 30 ms
-# XQueryPointer/XQueryKeymap poll loop breaks Flame's keyboard
-# handling: with livewire running, Shift stopped working in the Media
-# panel; stopping the detector's timer restored it immediately, with no
-# restart and no other change. Read-only X access was not enough — the
-# polling itself is the problem. The likely fix is to stop polling and
-# instead select XInput2 raw events once and drain them (no per-tick
-# round trips), but that needs a test host, not a working artist's box.
-# Set LINUX_ENABLED = True only on a machine you can afford to disturb.
+# Linux/X11 backend, take two: EVENT-DRIVEN via XInput2 raw events
+# (see xi2.py). The original 30 ms XQueryPointer/XQueryKeymap poll
+# loop broke Flame's keyboard handling — Shift died in the Media panel
+# and revived the instant the timer stopped; read-only access did not
+# help, the synchronous per-tick round trips were the cause. The xi2
+# reader makes ZERO X calls from Flame's threads: a dedicated thread
+# owns its own connection and drains raw events via select().
+# Disabled by default until validated: standalone first (python3
+# livewire/xi2.py outside Flame), then a short supervised in-Flame
+# session with the operator ready to kill it.
 LINUX_ENABLED = False
 
 if DARWIN:
@@ -58,6 +59,12 @@ if DARWIN:
             return (float(p.x), float(p.y))
         except Exception:
             return None
+
+    def start():
+        pass  # Quartz state queries need no reader thread
+
+    def stop():
+        pass
 
     def force_focus(window_id):
         pass  # macOS focus is the NSWindow makeKey dance in browser.py
@@ -100,103 +107,38 @@ if DARWIN:
             pass
 
 else:
-    import ctypes
-    import ctypes.util
+    from . import xi2
 
-    _x11 = None
-    _xtst = None
-    _dpy = None
-    _root = None
-    _keycodes = {}
+    _reader = None
 
-    def _init():
-        global _x11, _xtst, _dpy, _root
-        if _dpy is not None:
-            return True
-        try:
-            _x11 = ctypes.CDLL(ctypes.util.find_library("X11")
-                               or "libX11.so.6")
-            _x11.XOpenDisplay.restype = ctypes.c_void_p
-            _x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
-            _dpy = _x11.XOpenDisplay(None)
-            if not _dpy:
-                return False
-            _x11.XRootWindow.restype = ctypes.c_ulong
-            _x11.XRootWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
-            screen = _x11.XDefaultScreen(ctypes.c_void_p(_dpy))
-            _root = _x11.XRootWindow(ctypes.c_void_p(_dpy), screen)
-            try:
-                _xtst = ctypes.CDLL(ctypes.util.find_library("Xtst")
-                                    or "libXtst.so.6")
-            except Exception:
-                _xtst = None
-            return True
-        except Exception:
-            _dpy = None
-            return False
+    def start():
+        """Start the XI2 raw-event reader thread (idempotent)."""
+        global _reader
+        if _reader is None:
+            _reader = xi2.Reader()
+            _reader.start()
 
-    def _keycode(ch):
-        kc = _keycodes.get(ch)
-        if kc is None and _init():
-            ks = _x11.XStringToKeysym(ch.encode())
-            kc = _x11.XKeysymToKeycode(ctypes.c_void_p(_dpy), ks)
-            _keycodes[ch] = kc
-        return kc or 0
+    def stop():
+        global _reader
+        if _reader is not None:
+            _reader.stop()
+            _reader = None
 
     def button_down():
-        if not _init():
-            return False
-        root_ret = ctypes.c_ulong()
-        child_ret = ctypes.c_ulong()
-        rx = ctypes.c_int(); ry = ctypes.c_int()
-        wx = ctypes.c_int(); wy = ctypes.c_int()
-        mask = ctypes.c_uint()
-        _x11.XQueryPointer(ctypes.c_void_p(_dpy), _root,
-                           ctypes.byref(root_ret), ctypes.byref(child_ret),
-                           ctypes.byref(rx), ctypes.byref(ry),
-                           ctypes.byref(wx), ctypes.byref(wy),
-                           ctypes.byref(mask))
-        return bool(mask.value & 0x100)  # Button1Mask
+        return _reader.button1 if _reader is not None else False
 
     def key_down(ch):
-        if not _init():
-            return False
-        keys = (ctypes.c_char * 32)()
-        _x11.XQueryKeymap(ctypes.c_void_p(_dpy), keys)
-        kc = _keycode(ch)
-        if not kc:
-            return False
-        return bool(ord(keys[kc // 8]) & (1 << (kc % 8)))
+        return (ch in _reader.keys) if _reader is not None else False
 
     def app_active():
-        # v1: assume yes; the grab-point candidate guard already keeps
-        # stray non-Flame drags from arming anything meaningful.
         return True
 
     def cursor_loc():
-        if not _init():
-            return None
-        root_ret = ctypes.c_ulong()
-        child_ret = ctypes.c_ulong()
-        rx = ctypes.c_int(); ry = ctypes.c_int()
-        wx = ctypes.c_int(); wy = ctypes.c_int()
-        mask = ctypes.c_uint()
-        _x11.XQueryPointer(ctypes.c_void_p(_dpy), _root,
-                           ctypes.byref(root_ret), ctypes.byref(child_ret),
-                           ctypes.byref(rx), ctypes.byref(ry),
-                           ctypes.byref(wx), ctypes.byref(wy),
-                           ctypes.byref(mask))
-        return (float(rx.value), float(ry.value))
+        # only ever consumed by nudge(), which is a no-op on Linux
+        return None
 
-    # X11 backend is deliberately READ-ONLY: it queries pointer and key
-    # state and never mutates X. Two mutations were tried and removed —
-    # XTest pointer jiggle (unnecessary: Linux Flame repaints commits
-    # immediately) and XSetInputFocus for the popup (it broke Flame's
-    # modifier tracking — Shift stopped working in the Media panel,
-    # because stealing X focus while a modifier is held robs Flame of
-    # the KeyRelease). Qt's activateWindow alone gives the popup focus
-    # on X11, as originally validated. Do not reintroduce either.
-
+    # X11 is strictly hands-off: no synthetic input, no focus calls,
+    # and (now) no polling. See FINDINGS for the history.
     def nudge(loc=None):
         pass
 

@@ -852,10 +852,11 @@ def _start():
     if _timer is not None:
         return
     if not hid.DARWIN and not getattr(hid, "LINUX_ENABLED", False):
-        print("[livewire] Linux/X11 support is disabled pending a "
-              "redesign — the input poll loop interferes with Flame's "
-              "keyboard handling (Shift). See livewire/hid.py.")
+        print("[livewire] Linux/X11 support is disabled pending "
+              "validation of the event-driven XI2 backend. See "
+              "livewire/hid.py and livewire/xi2.py.")
         return
+    hid.start()
     _timer = QtCore.QTimer()
     _timer.timeout.connect(_tick)
     _timer.start(TICK_MS)
@@ -873,5 +874,6 @@ def uninstall():
             _timer.stop()
             _timer = None
         browser.close_all()
+        hid.stop()
         _log("detector stopped")
     flame.schedule_idle_event(_stop)
