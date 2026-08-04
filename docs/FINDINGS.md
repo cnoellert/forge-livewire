@@ -211,10 +211,43 @@ panel you want redrawn.
   X-protocol input observation from inside Flame's process disturbs
   this stack** (Rocky 9.5 / Flame 2026.2.1). Mechanism unknown; both
   bisects were clean. The X road is closed.
-- **The remaining Linux design is evdev** (`/dev/input/event*`):
-  kernel-level, no X protocol at all, structurally incapable of
-  interacting with X clients. Requires read access (input group
-  membership — a one-time `usermod -aG input <user>` + relogin).
+- **evdev is the shipping Linux backend** (`livewire/evdev_reader.py`):
+  reads `/dev/input/event*` on the dedicated reader thread — kernel
+  level, no X protocol. Requires read access (input group membership +
+  relogin, or an immediate `setfacl -m u:<user>:r /dev/input/event*`).
+  Kernel keycodes are physical/layout-free (F=33 M=50 G=34 R=19 I=23,
+  BTN_LEFT=272). Validated in-Flame over **PCoIP/HP Anyware** — whose
+  virtual input devices inject at the *kernel* level, so evdev sees
+  remote users (an XTEST-injecting remote stack would be invisible).
+
+## The Shift saga, resolved (2026-08-04)
+
+A week of "livewire breaks Shift" ended with every transport
+exonerated and the truth two layers away:
+
+1. Mask probes (XQueryPointer from an ssh-side client) first caught a
+   **phantom latched Ctrl in the X server** — every click was secretly
+   Ctrl+click, presenting as "Shift broken". Cured by tapping both
+   Ctrl keys. Classic PCoIP stranded-modifier failure: a modifier
+   keyup lost across a focus change.
+2. After the server was clean, shift-select STILL failed — with the
+   server provably seeing perfect Shift+Btn1 chords. **Flame's own
+   internal modifier latch was desynced**: old-school X apps track
+   modifiers from events delivered to them, and presses/releases that
+   land while another window (a popup, a PCoIP focus blink) holds
+   focus never reach Flame. Cure: focus Flame and tap each modifier
+   (both Shifts, both Ctrls, Alt) once — clean pairs resync it. A
+   Flame restart also cures it, which is why every restart all week
+   "fixed Shift".
+3. A controlled session of heavy livewire popup use left the server
+   mask **clean** — the popups strand nothing. The earlier "stopping
+   livewire fixed Shift instantly" bisections were confounded by the
+   focus churn and modifier taps that came with each test cycle.
+
+Diagnostic kit for next time: watch the server modifier mask from an
+ssh X client while the operator (a) rests hands, (b) holds Shift and
+clicks. Stuck bit at rest → tap that modifier. Clean chords ignored →
+Flame-internal desync → tap all modifiers with Flame focused.
 - **Bridge-unreachable ≠ Flame-dead.** The forge-bridge HTTP server
   can die inside a healthy, running Flame (observed after a python
   hook rescan: port 9999 unbound, Flame fine, operator-confirmed).

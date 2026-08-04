@@ -28,10 +28,12 @@ DARWIN = sys.platform == "darwin"
 # help, the synchronous per-tick round trips were the cause. The xi2
 # reader makes ZERO X calls from Flame's threads: a dedicated thread
 # owns its own connection and drains raw events via select().
-# Disabled by default until validated: standalone first (python3
-# livewire/xi2.py outside Flame), then a short supervised in-Flame
-# session with the operator ready to kill it.
-LINUX_ENABLED = False
+# Validated in production over PCoIP (2026-08-04): standalone, then
+# in-Flame — full gesture engine passing. The week-long "livewire
+# breaks Shift" saga was resolved as Flame-internal modifier desync
+# from focus churn, cured by tapping each modifier with Flame focused
+# (input chain proven clean end-to-end via server mask probes).
+LINUX_ENABLED = True
 
 if DARWIN:
     import Quartz

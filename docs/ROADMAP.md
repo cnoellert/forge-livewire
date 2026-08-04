@@ -129,13 +129,22 @@ studio: one shared checkout + symlinked hook per workstation, version
 tag, and eventually a Logik portal submission (which effectively
 requires items 2 and 5 for feature parity with expectations).
 
-## 9. Linux backend — ⚠️ REOPENED 2026-08-04 (disabled)
+## 9. Linux backend — ✅ SHIPPED (evdev) 2026-08-04, v1.1.0
 
 `livewire/hid.py` shim: macOS Quartz vs pure-ctypes X11
 (`XQueryPointer` button mask, `XQueryKeymap` via keysym→keycode,
 XTest 1px jiggle as the repaint nudge). Validated in production use on
 flame-01 (Rocky 9.5, Flame 2026.2.1, X11 `:1`) — popup takes focus
-with plain `activateWindow`, no NSWindow-style trick needed. **Take one (polling) disabled after a live regression:** the 30 ms
+with plain `activateWindow`, no NSWindow-style trick needed. **Final state: the evdev backend ships.** Kernel-level input reading
+(`evdev_reader.py`), no X protocol, validated in-Flame over PCoIP with
+the full gesture engine passing. The Shift saga that consumed the
+campaign was resolved as PCoIP stranded modifiers + Flame-internal
+modifier desync from focus churn — all three transports exonerated
+(see FINDINGS "The Shift saga, resolved"). xi2.py stays in-tree as the
+record of the X dead end (with the XI 2.0 grab-suppression finding).
+History below.
+
+**Take one (polling) disabled after a live regression:** the 30 ms
 XQueryPointer/XQueryKeymap loop broke Flame's Shift key; stopping the
 timer fixed it instantly (read-only access did not help).
 
