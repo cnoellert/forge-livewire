@@ -119,8 +119,13 @@ class Reader(object):
                                      ctypes.byref(ev_base),
                                      ctypes.byref(err_base)):
                 raise RuntimeError("XInputExtension not present")
+            # Negotiate XI >= 2.1: under 2.0 semantics the server
+            # SUPPRESSES raw events while a pointer grab is active —
+            # and Flame grabs the pointer for every noodle drag, so
+            # button releases vanished mid-gesture. 2.1 changed
+            # exactly this: raw events are delivered during grabs.
             major = ctypes.c_int(2)
-            minor = ctypes.c_int(0)
+            minor = ctypes.c_int(2)
             xi.XIQueryVersion(dp, ctypes.byref(major), ctypes.byref(minor))
 
             x.XRootWindow.restype = ctypes.c_ulong
