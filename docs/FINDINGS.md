@@ -180,8 +180,15 @@ panel you want redrawn.
   (`curl -X POST 127.0.0.1:9999/exec -d '{"code": ...}'`) — same
   probe-reload loop as the local MCP tools.
 - **No click-to-repaint quirk observed on Linux** — gang picks appear
-  immediately (user-confirmed). The XTest jiggle stays wired as cheap
-  insurance. User prefs on the test box exposed no `_user.*.batch`
+  immediately (user-confirmed), so no nudge is needed there.
+- **Never mutate X state from inside Flame.** Two attempts caused
+  trouble and both are removed: an XTest pointer jiggle (pointless —
+  see above) and `XSetInputFocus` to give the popup keyboard focus.
+  The latter **broke Flame's modifier tracking**: stealing X input
+  focus while a modifier is held robs Flame of the KeyRelease, and
+  Shift stopped working in the Media panel until livewire was
+  unloaded. Qt's `activateWindow()` alone is sufficient on X11. The
+  X11 backend is now strictly read-only (XQueryPointer/XQueryKeymap). User prefs on the test box exposed no `_user.*.batch`
   bins under `/opt/Autodesk/user/*` — location TBD.
 
 ## Socket geometry (calibrated 2026-08-04, Flame 2027)

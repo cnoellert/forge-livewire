@@ -11,9 +11,10 @@ Everything OS-specific lives here. The detector talks only to:
 
 macOS: Quartz event-source state polling + an NSMouseMoved posted to
 Flame's main window (in-process, no permissions).
-Linux/X11: XQueryPointer / XQueryKeymap via ctypes into libX11, and an
-XTest 1px pointer jiggle for the nudge (libXtst). No dependencies
-beyond the system X libraries.
+Linux/X11: XQueryPointer / XQueryKeymap via ctypes into libX11 — READ
+ONLY. The X11 side never injects input and never touches focus; both
+were tried and both caused problems (see the note in the linux
+branch). No dependencies beyond libX11.
 """
 
 import sys
@@ -176,60 +177,20 @@ else:
                            ctypes.byref(mask))
         return (float(rx.value), float(ry.value))
 
-    def nudge(loc=None):
-        """1px XTest pointer jiggle — generates a real MotionNotify.
-        Whether Flame-on-Linux even needs nudging is TBD; harmless if
-        not."""
-        if not _init() or _xtst is None:
-            return
-        try:
-            _xtst.XTestFakeRelativeMotionEvent(
-                ctypes.c_void_p(_dpy), 1, 0, 0)
-            _xtst.XTestFakeRelativeMotionEvent(
-                ctypes.c_void_p(_dpy), -1, 0, 0)
-            _x11.XFlush(ctypes.c_void_p(_dpy))
-        except Exception:
-            pass
+    # X11 backend is deliberately READ-ONLY: it queries pointer and key
+    # state and never mutates X. Two mutations were tried and removed —
+    # XTest pointer jiggle (unnecessary: Linux Flame repaints commits
+    # immediately) and XSetInputFocus for the popup (it broke Flame's
+    # modifier tracking — Shift stopped working in the Media panel,
+    # because stealing X focus while a modifier is held robs Flame of
+    # the KeyRelease). Qt's activateWindow alone gives the popup focus
+    # on X11, as originally validated. Do not reintroduce either.
 
-    _prev_focus = None
+    def nudge(loc=None):
+        pass
 
     def force_focus(window_id):
-        """Point X input focus at the popup, remembering what had it.
-        Qt's activateWindow alone doesn't reliably win keyboard focus
-        from Flame's fullscreen window under the WMs on Rocky."""
-        global _prev_focus
-        if not _init():
-            return
-        try:
-            if _prev_focus is None:
-                w = ctypes.c_ulong()
-                rev = ctypes.c_int()
-                _x11.XGetInputFocus(ctypes.c_void_p(_dpy),
-                                    ctypes.byref(w), ctypes.byref(rev))
-                if w.value > 1:      # not None/PointerRoot
-                    _prev_focus = w.value
-            _x11.XSetInputFocus(ctypes.c_void_p(_dpy),
-                                ctypes.c_ulong(window_id),
-                                2,   # RevertToParent
-                                0)   # CurrentTime
-            _x11.XFlush(ctypes.c_void_p(_dpy))
-        except Exception:
-            pass
+        pass
 
     def release_focus():
-        """Hand keyboard focus back to whoever had it before the popup.
-        Without this, closing a popup can leave X focus pointing at a
-        destroyed window — keys (and modifiers) then go nowhere."""
-        global _prev_focus
-        if not _init():
-            return
-        target = _prev_focus
-        _prev_focus = None
-        try:
-            _x11.XSetInputFocus(ctypes.c_void_p(_dpy),
-                                ctypes.c_ulong(target) if target
-                                else ctypes.c_ulong(1),  # PointerRoot
-                                2, 0)
-            _x11.XFlush(ctypes.c_void_p(_dpy))
-        except Exception:
-            pass
+        pass
