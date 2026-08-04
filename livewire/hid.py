@@ -107,15 +107,17 @@ if DARWIN:
             pass
 
 else:
-    from . import xi2
+    # evdev, not X: both X approaches broke Flame's Shift handling
+    # (see FINDINGS). xi2.py stays in-tree as the record of why.
+    from . import evdev_reader
 
     _reader = None
 
     def start():
-        """Start the XI2 raw-event reader thread (idempotent)."""
+        """Start the evdev reader thread (idempotent)."""
         global _reader
         if _reader is None:
-            _reader = xi2.Reader()
+            _reader = evdev_reader.Reader()
             _reader.start()
 
     def stop():
