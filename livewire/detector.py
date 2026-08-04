@@ -46,6 +46,10 @@ CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
                        # parents; smaller y is lower in action space)
 MEDIA_DX = 170         # media knots sit in line with their feeder,
                        # this far to its right
+MEDIA_DY = 150         # channel fan-out stacks medias this far apart
+CRYPTO_PAT = "crypto"  # channel names containing this (case-insens)
+                       # are crypto layers: excluded from Action
+                       # fan-out, exclusively used by CryptoMatte
 
 VERBOSE = False  # arm/commit chatter in the shell; errors always print
 
@@ -276,6 +280,69 @@ def _instantiate_batch(entry, cp):
     return new, new
 
 
+def _channels(outs):
+    """Split channel sockets from their _alpha siblings."""
+    alpha = {o[:-len("_alpha")]: o for o in outs if o.endswith("_alpha")}
+    chans = [o for o in outs if not o.endswith("_alpha")]
+    return chans, alpha
+
+
+def _wire_channels_to_action(new, src, outs):
+    """Multichannel clip → Action: rgba to Back, one media per
+    remaining non-crypto channel (its _alpha sibling to media Matte)."""
+    chans, alpha = _channels(outs)
+    non_crypto = [c for c in chans if CRYPTO_PAT not in c.lower()]
+    if len(non_crypto) < 3:
+        return False
+    back = "rgba" if "rgba" in non_crypto else non_crypto[0]
+    _connect(src, back, new, "Back")
+    sx = float(_attr(src.pos_x))
+    sy = float(_attr(src.pos_y))
+    i = 0
+    for c in non_crypto:
+        if c == back:
+            continue
+        media = new.add_media()
+        try:
+            media.pos_x = int(sx + MEDIA_DX)
+            media.pos_y = int(sy - i * MEDIA_DY)
+        except Exception:
+            pass
+        _connect(src, c, media, "Front")
+        if c in alpha:
+            _connect(src, alpha[c], media, "Matte")
+        i += 1
+    _log("channel fan-out: %d medias (+%s to Back), crypto skipped: %d"
+         % (i, back, len(chans) - len(non_crypto)))
+    return True
+
+
+def _wire_channels_to_crypto(new, src, outs):
+    """Multichannel clip → CryptoMatte: rgba to Front, the chosen
+    crypto family's numbered rank layers to uCryptoNNrgb/a."""
+    import re
+    fams = sorted({m.group(1) for o in outs
+                   for m in [re.match(r"(.*%s.*?)(\d{2})$" % CRYPTO_PAT,
+                                      o, re.I)] if m})
+    if not fams:
+        return False
+    fam = next((f for f in fams if "mat" in f.lower()), fams[0])
+    if len(fams) > 1:
+        _log("crypto families %s — wiring %s (others skipped)"
+             % (fams, fam))
+    if "rgba" in outs:
+        _connect(src, "rgba", new, "Front")
+    for i in range(3):
+        cname = "%s%02d" % (fam, i)
+        if cname not in outs:
+            continue
+        _connect(src, cname, new, "uCrypto%02drgb" % i)
+        aname = cname + "_alpha"
+        if aname in outs:
+            _connect(src, aname, new, "uCrypto%02da" % i)
+    return True
+
+
 def _commit_batch(entry, out_socket, cp, source, mode):
     """Create + wire one pick; returns the chain-out node."""
     new, out_node = _instantiate_batch(entry, cp)
@@ -287,6 +354,20 @@ def _commit_batch(entry, out_socket, cp, source, mode):
             ins = [str(s) for s in _attr(new.input_sockets)]
         except Exception:
             pass
+        # Channel fan-out: a multichannel source (EXR clip etc.) picked
+        # onto an Action or CryptoMatte dispatches on the target, like
+        # every other converge. Only when no multi-select is in play.
+        if not (source.get("extra") or []):
+            try:
+                new_type = str(_attr(new.type))
+            except Exception:
+                new_type = ""
+            if (new_type == "Action"
+                    and _wire_channels_to_action(new, src, outs)):
+                return out_node
+            if (new_type == "CryptoMatte"
+                    and _wire_channels_to_crypto(new, src, outs)):
+                return out_node
         if mode == "front_matte":
             front_out = ("Result" if "Result" in outs
                          else (outs[0] if outs else None))
