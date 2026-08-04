@@ -851,6 +851,11 @@ def _start():
     global _timer
     if _timer is not None:
         return
+    if not hid.DARWIN and not getattr(hid, "LINUX_ENABLED", False):
+        print("[livewire] Linux/X11 support is disabled pending a "
+              "redesign — the input poll loop interferes with Flame's "
+              "keyboard handling (Shift). See livewire/hid.py.")
+        return
     _timer = QtCore.QTimer()
     _timer.timeout.connect(_tick)
     _timer.start(TICK_MS)

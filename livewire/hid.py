@@ -21,6 +21,17 @@ import sys
 
 DARWIN = sys.platform == "darwin"
 
+# Linux/X11 is DISABLED pending a redesign (2026-08-04). The 30 ms
+# XQueryPointer/XQueryKeymap poll loop breaks Flame's keyboard
+# handling: with livewire running, Shift stopped working in the Media
+# panel; stopping the detector's timer restored it immediately, with no
+# restart and no other change. Read-only X access was not enough — the
+# polling itself is the problem. The likely fix is to stop polling and
+# instead select XInput2 raw events once and drain them (no per-tick
+# round trips), but that needs a test host, not a working artist's box.
+# Set LINUX_ENABLED = True only on a machine you can afford to disturb.
+LINUX_ENABLED = False
+
 if DARWIN:
     import Quartz
 

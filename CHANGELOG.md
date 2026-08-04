@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3 — 2026-08-04
+
+**Linux/X11 disabled.** With livewire running on Rocky, Shift stopped
+working in Flame's Media panel; stopping the detector's 30 ms poll
+timer restored it immediately, with no restart. A read-only X backend
+(no XTest, no XSetInputFocus) did not help — the polling itself is the
+cause. `LINUX_ENABLED = False` in `livewire/hid.py` until the backend
+is redesigned around XInput2 raw events instead of polling. macOS is
+unaffected and unchanged.
+
 ## 1.0.0 — 2026-08-04
 
 First stable release. Livewire went from "could a daemon watch the
@@ -41,8 +51,9 @@ point's offset and pre-selects the socket menu — calibrated for
 standard nodes and expanded multichannel clips; declines rather than
 guesses when the geometry is ambiguous.
 
-**Platforms.** macOS (Quartz) and Rocky Linux/X11 (pure-ctypes
-libX11/libXtst) behind one `hid.py` shim. Flame 2026.x and 2027
+**Platforms.** macOS (Quartz). A Linux/X11 backend exists behind the
+same `hid.py` shim but is **disabled in 1.0.3** — its poll loop
+interferes with Flame's keyboard handling. Flame 2026.x and 2027
 (per-interpreter vendored PyObjC on macOS).
 
 Everything discovered along the way — how Flame routes input below Qt,

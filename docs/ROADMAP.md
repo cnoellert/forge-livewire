@@ -129,15 +129,20 @@ studio: one shared checkout + symlinked hook per workstation, version
 tag, and eventually a Logik portal submission (which effectively
 requires items 2 and 5 for feature parity with expectations).
 
-## 9. Linux backend — ✅ shipped 2026-08-03
+## 9. Linux backend — ⚠️ REOPENED 2026-08-04 (disabled)
 
 `livewire/hid.py` shim: macOS Quartz vs pure-ctypes X11
 (`XQueryPointer` button mask, `XQueryKeymap` via keysym→keycode,
 XTest 1px jiggle as the repaint nudge). Validated in production use on
 flame-01 (Rocky 9.5, Flame 2026.2.1, X11 `:1`) — popup takes focus
-with plain `activateWindow`, no NSWindow-style trick needed. Remaining
-Linux follow-ups: repaint confirmed immediate (jiggle kept as
-insurance); `app_active()` is a stub (always True); flame-01's user bins/favorites came up empty —
+with plain `activateWindow`, no NSWindow-style trick needed. **Disabled after a live regression:** livewire's 30 ms
+XQueryPointer/XQueryKeymap loop breaks Flame's keyboard handling —
+Shift died in the Media panel and came back the instant the timer was
+stopped (a read-only backend did not help; the polling is the cause).
+Redesign required: select XInput2 raw events once and drain them, no
+synchronous round trips from Flame's main thread. Test on a
+disposable host only. Other open Linux items: `app_active()` is a stub
+(always True); flame-01's user bins/favorites came up empty —
 find where 2026.2.1 keeps user prefs on that box; Wayland untested
 (Flame ships X11).
 

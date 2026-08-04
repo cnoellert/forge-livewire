@@ -181,14 +181,25 @@ panel you want redrawn.
   probe-reload loop as the local MCP tools.
 - **No click-to-repaint quirk observed on Linux** — gang picks appear
   immediately (user-confirmed), so no nudge is needed there.
-- **Never mutate X state from inside Flame.** Two attempts caused
-  trouble and both are removed: an XTest pointer jiggle (pointless —
-  see above) and `XSetInputFocus` to give the popup keyboard focus.
-  The latter **broke Flame's modifier tracking**: stealing X input
-  focus while a modifier is held robs Flame of the KeyRelease, and
-  Shift stopped working in the Media panel until livewire was
-  unloaded. Qt's `activateWindow()` alone is sufficient on X11. The
-  X11 backend is now strictly read-only (XQueryPointer/XQueryKeymap). User prefs on the test box exposed no `_user.*.batch`
+- **The X11 poll loop breaks Flame's keyboard handling — Linux is
+  disabled (2026-08-04).** With livewire running, Shift stopped
+  working in the Media panel. Bisected live: **stopping the detector's
+  30 ms QTimer restored Shift immediately** — no restart, nothing else
+  changed. First theory was `XSetInputFocus` stealing focus while a
+  modifier was held; that was **refuted** — a strictly read-only
+  backend (XQueryPointer/XQueryKeymap only, no XTest, no focus calls)
+  still broke it. The polling itself is the problem, and note the key
+  queries only run *during a drag* while the pointer query runs
+  always, so `XQueryPointer` at 30 ms on Flame's main thread is the
+  prime suspect.
+- **Next design to try (untested):** stop polling. Select XInput2 raw
+  events (`XISelectEvents` on root for RawButtonPress/RawKeyPress) on
+  a dedicated connection and drain them per tick — no synchronous
+  round trips into the X server from Flame's main thread. Needs a
+  disposable host; do not iterate on a working artist's machine.
+- macOS is unaffected: the Quartz backend
+  (`CGEventSourceButtonState`/`KeyState`) has run for a week with no
+  input side effects. User prefs on the test box exposed no `_user.*.batch`
   bins under `/opt/Autodesk/user/*` — location TBD.
 
 ## Socket geometry (calibrated 2026-08-04, Flame 2027)
