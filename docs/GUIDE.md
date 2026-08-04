@@ -138,9 +138,17 @@ Everything Flame can make, tagged by origin:
 - **`Reduce Noise v6 - OpenFX`** — OFX plugins, created with the plugin
   selected.
 
-With an empty search box, the list is ordered by **your** habits —
-Flame's own favorites first, then your most-used tools. Search matches
+With an empty search box, the list is ordered by **your** habits:
+pinned and favorite tools first, then by use — and livewire learns
+from every commit, so the nodes you actually pick climb the list and
+your most recent picks break ties. (It also seeds from Flame's own
+search history, so day one already looks like you.) Search matches
 prefer prefixes, then word starts, then anything-inside, then fuzzy.
+
+To pin something permanently to the top, add its display name (e.g.
+`"Lens_Blur - User"`) to the `pinned` list in `~/.config/livewire.json`
+— your usage history lives in the same file, and it travels with your
+home directory.
 
 Installed new shaders or saved new bins mid-session? Run
 `livewire.reindex()` in the Flame python console, or just restart.

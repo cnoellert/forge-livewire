@@ -113,12 +113,18 @@ def _match(query, text):
 
 
 def _rank(query, entry):
-    """Sort key: match quality, then favorite, then Flame usage weight."""
+    """Sort key: match quality, then pinned/favorite, then a usage score
+    (livewire's own commit counts weighted over Flame's search weights),
+    then recency, then name."""
+    from . import store
     m = _match(query, entry["display"])
     if m is None:
         return None
-    return (m, 0 if entry.get("fav") else 1, -entry.get("weight", 0),
-            entry["display"].lower())
+    disp = entry["display"]
+    u = store.usage().get(disp) or {}
+    pin = entry.get("fav") or disp in store.pinned()
+    score = u.get("n", 0) * 4 + entry.get("weight", 0)
+    return (m, 0 if pin else 1, -score, -u.get("t", 0), disp.lower())
 
 
 class NodeBrowser(QtWidgets.QWidget):

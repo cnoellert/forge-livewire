@@ -90,13 +90,16 @@ Approach: probe session grabbing every output of multi-output nodes
 sockets left-to-right reliably, map offset rank → `output_sockets` index.
 Fallback stays the combo. Watch zoom dependence — offsets may scale.
 
-## 5. Favorites / recents
+## 5. Favorites / recents — ✅ shipped 2026-08-04
 
-Persistent per-artist JSON (`~/.config/livewire.json` or similar): count
-commits per node type, rank recents/frequents above the alphabetical
-list, optional pinned favorites. Cheap, big daily-feel win. Also the
-natural home for artist config (arm keys, theme) so shared installs
-don't require editing source — see item 8.
+`livewire/store.py`: per-artist `~/.config/livewire.json` (atomic
+writes), every browser commit records count + timestamp per display
+name. Ranking = match quality → pinned (Flame favorites + the JSON's
+hand-editable `pinned` list) → usage score (livewire count ×4 +
+Flame's search weight) → recency → name. The same file is item 8's
+future config home. Follow-ups: a pin gesture in the browser UI
+(right-click or a key); usage decay if ancient habits ever crowd the
+list.
 
 ## 6. Insert into an existing noodle
 

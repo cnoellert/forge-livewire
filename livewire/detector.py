@@ -605,12 +605,20 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
             # Browser callbacks run on Flame's main thread, so commit
             # directly — schedule_idle_event would sit in Flame's idle
             # queue until the user next touches Flame's own UI.
+            committed = 0
             for ch in chains:
                 try:
                     do_chain(ch)
+                    committed += 1
                 except Exception as e:
                     print("[livewire] commit failed (%s): %r"
                           % (ch["source"].get("name"), e))
+            if committed:
+                try:
+                    from . import store
+                    store.record(entry["display"])
+                except Exception:
+                    pass
             _nudge_burst(state.get("nsloc"))
 
         browser.show_browser(

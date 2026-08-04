@@ -135,10 +135,13 @@ The browser lists far more than the built-in node types: stock Matchbox
 shaders (`Blur - Matchbox`, created with the shader loaded), your user
 bins (`Lens_Blur - User`, appended and wired at the drop point), and
 OpenFX plugins (`Reduce Noise v6 - OpenFX`, created with the plugin
-selected). Ranking comes from Flame's own search data — favorites
-first, then your most-used tools — so an empty search box already
-shows what you reach for daily. After installing new shaders or saving
-new bins mid-session, run `livewire.reindex()` (or restart Flame).
+selected). Ranking: pinned/favorite entries first, then a usage score
+blending livewire's own per-commit counts (learned continuously,
+persisted to `~/.config/livewire.json` with a hand-editable `pinned`
+list) over Flame's search weights, with recency as the tiebreak — an
+empty search box shows what you actually reach for. After installing
+new shaders or saving new bins mid-session, run `livewire.reindex()`
+(or restart Flame).
 
 ## What it does *not* do (yet)
 
