@@ -123,7 +123,18 @@ insurance); `app_active()` is a stub (always True); flame-01's user bins/favorit
 find where 2026.2.1 keeps user prefs on that box; Wayland untested
 (Flame ships X11).
 
-## 10. Channel fan-out: multichannel EXR / multitrack → Action & Cryptomatte — NEXT UP
+## 10. Channel fan-out: multichannel EXR → Action & CryptoMatte — ✅ shipped 2026-08-04
+
+Shipped and verified against production V-Ray multipart EXRs (33–39
+sockets): Action pick = rgba→Back + one media per non-crypto channel
+(`_alpha` sibling → media Matte), medias stacked beside the clip;
+CryptoMatte pick = one CryptoMatte node per crypto family (MAT first,
+extras stacked), rgba→Front + rank layers → uCryptoNNrgb/a. Works on
+collapsed AND expanded clips — expanded ones match grabs along a
+vertical segment (EXPANDED_STEP≈55 units/socket; `collapsed` is a
+readable node attribute). Follow-ups: family picker UI; multitrack
+clips and *groups* still unprobed; socket-tab-specific grabs await
+item 4. Original brief:
 
 The missing half of the fan-out grammar: converge maps N selected
 nodes → N inputs; this maps the M output sockets of ONE node → M
