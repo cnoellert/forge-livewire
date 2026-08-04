@@ -182,6 +182,24 @@ existing node, wire without the browser) — a new gesture class,
 kin to item 6's drop-on-target; design after the create-and-wire
 version proves the filtering.
 
+## 11. Fan-out products become parallel chain heads
+
+When a single pick produces SEVERAL nodes — a CryptoMatte fan-out
+creating one node per crypto family, an Action fan-out creating N
+media layers, a multi-node user bin — the gang currently continues
+from one of them. It should be able to continue from *all* of them,
+turning the fan-out into the heads of parallel chains (exactly what
+R does across a selection, but seeded by the fan-out instead).
+
+Shape: have the commit helpers return every node they created, not
+just the chain-out node; if a gang/replicate is active and more than
+one came back, split `chains` into one entry per product. Natural
+demo: MC clip → CryptoMatte (2 families) → next pick lands on both
+crypto nodes. Question to settle first: should plain G do this
+automatically, or should it require R? (Leaning: G follows the
+primary product, R adopts all of them — keeps "replicate" the verb
+that means many.)
+
 ## Known rough edges (small, unordered)
 
 - Armed release *onto* a node's input completes the native connection

@@ -50,8 +50,8 @@ the `cursor_position` primitive, the repaint-nudge ladder, the
 `hasattr` trap, socket geometry — is written up in
 [docs/FINDINGS.md](docs/FINDINGS.md).
 
-**Known open:** R (replicate) needs its multi-selection to survive the
-grab; if Flame clears selection on press in some cases the selection
-should be captured in the press snapshot instead of at arm time.
-Interactive pin/tag controls are deliberately absent — two attempts
-crashed Flame; pins and tags are file-edited.
+**Known open:** a pick that fans out into several nodes (two
+CryptoMattes, an Action plus its medias) leaves the chain following
+only one of them — see roadmap item 11. Interactive pin/tag controls
+are deliberately absent: two attempts crashed Flame, so pins and tags
+are file-edited.
