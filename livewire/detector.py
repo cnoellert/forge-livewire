@@ -641,7 +641,12 @@ def _infer_socket(outs, anchor, samples, meta):
     sy = sorted(p[1] for p in pts)[len(pts) // 2]
     dx = sx - anchor[0]
     dy = sy - anchor[1]
-    if meta and not meta[1]:  # expanded multichannel clip
+    if meta and meta[1]:
+        # Collapsed multichannel clip: it draws ONE stacked output, so
+        # there is no per-socket geometry to read — inferring would map
+        # the grab to an arbitrary middle channel (crypto, in practice).
+        return None
+    if meta:  # expanded multichannel clip
         visible = [o for o in outs if not o.endswith("_alpha")]
         step = SOCK_EXR_STEP
         top = (len(visible) - 1) / 2.0 * step - SOCK_EXR_PAD
