@@ -129,13 +129,25 @@ studio: one shared checkout + symlinked hook per workstation, version
 tag, and eventually a Logik portal submission (which effectively
 requires items 2 and 5 for feature parity with expectations).
 
-## 9. Linux backend — ✅ SHIPPED (evdev) 2026-08-04, v1.1.0
+## 9. Linux backend — ⚠️ COMPLETE BUT DEFAULT-OFF (evdev, v1.1.1)
 
 `livewire/hid.py` shim: macOS Quartz vs pure-ctypes X11
 (`XQueryPointer` button mask, `XQueryKeymap` via keysym→keycode,
 XTest 1px jiggle as the repaint nudge). Validated in production use on
 flame-01 (Rocky 9.5, Flame 2026.2.1, X11 `:1`) — popup takes focus
-with plain `activateWindow`, no NSWindow-style trick needed. **Final state: the evdev backend ships.** Kernel-level input reading
+with plain `activateWindow`, no NSWindow-style trick needed. **Status correction (end of day):** functionally complete and
+validated (including PCoIP-reconnect device rescan + udev auto-ACL),
+but the test box hard-crashed twice without coredumps during the
+campaign — once with the app log ending exactly at livewire's `_start`
+idle event. Ambiguous (the same box crashed with livewire absent, has
+chronically broken third-party hooks, and logs nothing in normal use),
+but unproven safety on a production machine means `LINUX_ENABLED`
+defaults to False and the flame-01 hook is pulled. To clear it: a soak
+test on a disposable Rocky+Flame host — hours of uptime with the
+detector running, popups exercised, and crash monitoring. macOS is
+unaffected throughout.
+
+**Final state: the evdev backend ships.** Kernel-level input reading
 (`evdev_reader.py`), no X protocol, validated in-Flame over PCoIP with
 the full gesture engine passing. The Shift saga that consumed the
 campaign was resolved as PCoIP stranded modifiers + Flame-internal
