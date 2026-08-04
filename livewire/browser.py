@@ -133,97 +133,13 @@ def _rank(query, entry):
     return (m, 0 if pin else 1, -score, -u.get("t", 0), disp.lower())
 
 
-class _RowIcons(QtWidgets.QStyledItemDelegate):
-    """Star (pin) and tag controls on the current row, Flame-style.
-    Drawn as vector paths — Discreet's glyph coverage is not trusted."""
-
-    ICON_W = 20
-
-    def __init__(self, browser):
-        super().__init__(browser)
-        self._browser = browser
-
-    def _rects(self, opt):
-        r = opt.rect
-        tag = QtCore.QRect(r.right() - self.ICON_W - 4,
-                           r.top(), self.ICON_W, r.height())
-        star = QtCore.QRect(tag.left() - self.ICON_W,
-                            r.top(), self.ICON_W, r.height())
-        return star, tag
-
-    @staticmethod
-    def _star_path(rect):
-        import math
-        cx, cy = rect.center().x(), rect.center().y() + 0.5
-        R, r = rect.height() * 0.28, rect.height() * 0.115
-        path = QtGui.QPainterPath()
-        for i in range(10):
-            ang = -math.pi / 2 + i * math.pi / 5
-            rad = R if i % 2 == 0 else r
-            pt = QtCore.QPointF(cx + rad * math.cos(ang),
-                                cy + rad * math.sin(ang))
-            if i == 0:
-                path.moveTo(pt)
-            else:
-                path.lineTo(pt)
-        path.closeSubpath()
-        return path
-
-    def paint(self, p, opt, index):
-        super().paint(p, opt, index)
-        if not (opt.state & QtWidgets.QStyle.State_Selected):
-            return
-        entry = index.data(QtCore.Qt.UserRole)
-        if not entry:
-            return
-        from . import store
-        star, tag = self._rects(opt)
-        p.save()
-        p.setRenderHint(QtGui.QPainter.Antialiasing)
-        pinned = (entry.get("fav")
-                  or entry["display"] in store.pinned())
-        col = QtGui.QColor(opt.palette.highlightedText().color())
-        p.setPen(QtGui.QPen(col, 1.1))
-        p.setBrush(col if pinned else QtCore.Qt.NoBrush)
-        p.drawPath(self._star_path(star))
-        # tag: a little label shape with a hole
-        t = tag.adjusted(4, tag.height() // 2 - 5, -4, 0)
-        t.setHeight(10)
-        p.setBrush(QtCore.Qt.NoBrush)
-        body = QtGui.QPainterPath()
-        body.moveTo(t.left() + 3, t.top())
-        body.lineTo(t.right() - 4, t.top())
-        body.lineTo(t.right(), t.center().y())
-        body.lineTo(t.right() - 4, t.bottom())
-        body.lineTo(t.left() + 3, t.bottom())
-        body.closeSubpath()
-        p.drawPath(body)
-        p.drawEllipse(QtCore.QPointF(t.left() + 6, t.center().y()), 1.2, 1.2)
-        p.restore()
-
-    def editorEvent(self, ev, model, opt, index):
-        # swallow BOTH press and release over the icons — the release
-        # would otherwise reach itemClicked and commit the row
-        if ev.type() in (QtCore.QEvent.MouseButtonPress,
-                         QtCore.QEvent.MouseButtonRelease) \
-                and (opt.state & QtWidgets.QStyle.State_Selected):
-            star, tag = self._rects(opt)
-            entry = index.data(QtCore.Qt.UserRole)
-            if entry and (star.contains(ev.pos())
-                          or tag.contains(ev.pos())):
-                if ev.type() == QtCore.QEvent.MouseButtonPress:
-                    from . import store
-                    if star.contains(ev.pos()):
-                        store.toggle_pin(entry["display"])
-                        self._browser._list.viewport().update()
-                    else:
-                        # defer out of the mouse event before touching
-                        # focus — doing it synchronously crashed Flame
-                        QtCore.QTimer.singleShot(
-                            0, lambda e=entry:
-                            self._browser._edit_tags(e))
-                return True
-        return False
+# NOTE: a QStyledItemDelegate drawing clickable star/tag icons on the
+# row was tried and REMOVED — it crashed Flame on click (twice). Qt6
+# dropped QMouseEvent.pos(), and an exception raised inside a delegate
+# propagates through Qt's C++ event dispatch and takes the host down.
+# Pin/tag now ride keyboard shortcuts through the search field's event
+# filter, which has been stable since v0.1. Do not reintroduce
+# delegate-based row controls without testing in a scratch project.
 
 
 class NodeBrowser(QtWidgets.QWidget):
@@ -292,7 +208,6 @@ class NodeBrowser(QtWidgets.QWidget):
         self._list = QtWidgets.QListWidget(self)
         self._list.setAlternatingRowColors(True)
         self._list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        self._list.setItemDelegate(_RowIcons(self))
         self._list.itemActivated.connect(lambda _i: self._commit())
         self._list.itemClicked.connect(lambda _i: self._commit())
         lay.addWidget(self._list)
@@ -356,6 +271,22 @@ class NodeBrowser(QtWidgets.QWidget):
                     self._end_tag_edit(False)
                     return True
                 return False
+            mods = ev.modifiers()
+            ctrlish = mods & (QtCore.Qt.ControlModifier
+                              | QtCore.Qt.MetaModifier)
+            if ctrlish and key in (QtCore.Qt.Key_P, QtCore.Qt.Key_T):
+                item = self._list.currentItem()
+                entry = item.data(QtCore.Qt.UserRole) if item else None
+                if entry:
+                    if key == QtCore.Qt.Key_P:
+                        from . import store
+                        now = store.toggle_pin(entry["display"])
+                        self._flash(u"%s  %s"
+                                    % ("pinned" if now else "unpinned",
+                                       entry["display"]))
+                    else:
+                        self._edit_tags(entry)
+                return True
             if key in (QtCore.Qt.Key_Down, QtCore.Qt.Key_Up):
                 row = self._list.currentRow()
                 row += 1 if key == QtCore.Qt.Key_Down else -1
@@ -371,6 +302,13 @@ class NodeBrowser(QtWidgets.QWidget):
         return False
 
     # -- tags --------------------------------------------------------------
+
+    def _flash(self, msg):
+        """Transient note in the header, then back to normal."""
+        if self._header is None:
+            return
+        self._header.setText(msg)
+        QtCore.QTimer.singleShot(1200, self._update_header)
 
     def _edit_tags(self, entry):
         """Inline tag editing: the search field becomes the tag editor
