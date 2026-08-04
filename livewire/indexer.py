@@ -64,7 +64,7 @@ def _stock_matchbox_dirs():
 
 
 def _search_meta():
-    """name -> (weight, favorite); plus the set of used OFX labels."""
+    """name -> (weight, favorite, tags); plus the set of used OFX labels."""
     meta, ofx = {}, set()
     tools = []
     for root in _PREF_ROOTS:
@@ -79,9 +79,11 @@ def _search_meta():
             name = t.get("Name")
             if not name:
                 continue
-            old = meta.get(name, (0, False))
+            old = meta.get(name, (0, False, []))
+            new_tags = [str(x) for x in (t.get("Tags") or [])]
             meta[name] = (max(old[0], int(t.get("Weight", 0))),
-                          old[1] or bool(t.get("Favorite")))
+                          old[1] or bool(t.get("Favorite")),
+                          sorted(set(old[2]) | set(new_tags)))
             if t.get("Type") == "OpenFX":
                 ofx.add(name)
     except Exception:
@@ -120,9 +122,9 @@ def _batch_ofx_labels():
 
 
 def _entry(display, label, kind, payload, meta):
-    w, fav = meta.get(label, meta.get(display, (0, False)))
+    w, fav, tags = meta.get(label, meta.get(display, (0, False, [])))
     return {"display": display, "label": label, "kind": kind,
-            "payload": payload, "fav": fav, "weight": w}
+            "payload": payload, "fav": fav, "weight": w, "tags": tags}
 
 
 def build(node_types):

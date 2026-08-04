@@ -28,6 +28,7 @@ def _load():
             _state = {}
         _state.setdefault("usage", {})
         _state.setdefault("pinned", [])
+        _state.setdefault("tags", {})
     return _state
 
 
@@ -37,6 +38,31 @@ def usage():
 
 def pinned():
     return _load()["pinned"]
+
+
+def toggle_pin(display):
+    """Flip pin state; returns the new state."""
+    p = _load()["pinned"]
+    if display in p:
+        p.remove(display)
+    else:
+        p.append(display)
+    _save()
+    return display in p
+
+
+def tags():
+    return _load()["tags"]
+
+
+def set_tags(display, tag_list):
+    t = _load()["tags"]
+    tag_list = [x.strip() for x in tag_list if x.strip()]
+    if tag_list:
+        t[display] = tag_list
+    else:
+        t.pop(display, None)
+    _save()
 
 
 def record(display):

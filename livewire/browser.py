@@ -115,16 +115,111 @@ def _match(query, text):
 def _rank(query, entry):
     """Sort key: match quality, then pinned/favorite, then a usage score
     (livewire's own commit counts weighted over Flame's search weights),
-    then recency, then name."""
+    then recency, then name. Tags (Flame's search synonyms + the
+    artist's own) match at substring quality."""
     from . import store
-    m = _match(query, entry["display"])
+    disp = entry["display"]
+    m = _match(query, disp)
+    if m is None and query:
+        hay = " ".join((entry.get("tags") or [])
+                       + (store.tags().get(disp) or []))
+        if hay and query.lower() in hay.lower():
+            m = 2
     if m is None:
         return None
-    disp = entry["display"]
     u = store.usage().get(disp) or {}
     pin = entry.get("fav") or disp in store.pinned()
     score = u.get("n", 0) * 4 + entry.get("weight", 0)
     return (m, 0 if pin else 1, -score, -u.get("t", 0), disp.lower())
+
+
+class _RowIcons(QtWidgets.QStyledItemDelegate):
+    """Star (pin) and tag controls on the current row, Flame-style.
+    Drawn as vector paths — Discreet's glyph coverage is not trusted."""
+
+    ICON_W = 20
+
+    def __init__(self, browser):
+        super().__init__(browser)
+        self._browser = browser
+
+    def _rects(self, opt):
+        r = opt.rect
+        tag = QtCore.QRect(r.right() - self.ICON_W - 4,
+                           r.top(), self.ICON_W, r.height())
+        star = QtCore.QRect(tag.left() - self.ICON_W,
+                            r.top(), self.ICON_W, r.height())
+        return star, tag
+
+    @staticmethod
+    def _star_path(rect):
+        import math
+        cx, cy = rect.center().x(), rect.center().y() + 0.5
+        R, r = rect.height() * 0.28, rect.height() * 0.115
+        path = QtGui.QPainterPath()
+        for i in range(10):
+            ang = -math.pi / 2 + i * math.pi / 5
+            rad = R if i % 2 == 0 else r
+            pt = QtCore.QPointF(cx + rad * math.cos(ang),
+                                cy + rad * math.sin(ang))
+            if i == 0:
+                path.moveTo(pt)
+            else:
+                path.lineTo(pt)
+        path.closeSubpath()
+        return path
+
+    def paint(self, p, opt, index):
+        super().paint(p, opt, index)
+        if not (opt.state & QtWidgets.QStyle.State_Selected):
+            return
+        entry = index.data(QtCore.Qt.UserRole)
+        if not entry:
+            return
+        from . import store
+        star, tag = self._rects(opt)
+        p.save()
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        pinned = (entry.get("fav")
+                  or entry["display"] in store.pinned())
+        col = QtGui.QColor(opt.palette.highlightedText().color())
+        p.setPen(QtGui.QPen(col, 1.1))
+        p.setBrush(col if pinned else QtCore.Qt.NoBrush)
+        p.drawPath(self._star_path(star))
+        # tag: a little label shape with a hole
+        t = tag.adjusted(4, tag.height() // 2 - 5, -4, 0)
+        t.setHeight(10)
+        p.setBrush(QtCore.Qt.NoBrush)
+        body = QtGui.QPainterPath()
+        body.moveTo(t.left() + 3, t.top())
+        body.lineTo(t.right() - 4, t.top())
+        body.lineTo(t.right(), t.center().y())
+        body.lineTo(t.right() - 4, t.bottom())
+        body.lineTo(t.left() + 3, t.bottom())
+        body.closeSubpath()
+        p.drawPath(body)
+        p.drawEllipse(QtCore.QPointF(t.left() + 6, t.center().y()), 1.2, 1.2)
+        p.restore()
+
+    def editorEvent(self, ev, model, opt, index):
+        # swallow BOTH press and release over the icons — the release
+        # would otherwise reach itemClicked and commit the row
+        if ev.type() in (QtCore.QEvent.MouseButtonPress,
+                         QtCore.QEvent.MouseButtonRelease) \
+                and (opt.state & QtWidgets.QStyle.State_Selected):
+            star, tag = self._rects(opt)
+            entry = index.data(QtCore.Qt.UserRole)
+            if entry and (star.contains(ev.pos())
+                          or tag.contains(ev.pos())):
+                if ev.type() == QtCore.QEvent.MouseButtonPress:
+                    from . import store
+                    if star.contains(ev.pos()):
+                        store.toggle_pin(entry["display"])
+                        self._browser._list.viewport().update()
+                    else:
+                        self._browser._edit_tags(entry)
+                return True
+        return False
 
 
 class NodeBrowser(QtWidgets.QWidget):
@@ -192,6 +287,7 @@ class NodeBrowser(QtWidgets.QWidget):
         self._list = QtWidgets.QListWidget(self)
         self._list.setAlternatingRowColors(True)
         self._list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self._list.setItemDelegate(_RowIcons(self))
         self._list.itemActivated.connect(lambda _i: self._commit())
         self._list.itemClicked.connect(lambda _i: self._commit())
         lay.addWidget(self._list)
@@ -256,6 +352,50 @@ class NodeBrowser(QtWidgets.QWidget):
                 return True
         return False
 
+    # -- tags --------------------------------------------------------------
+
+    def _edit_tags(self, entry):
+        """Tiny popover editing the entry's custom tags, comma-separated."""
+        from . import store
+        disp = entry["display"]
+        pop = QtWidgets.QWidget(None, QtCore.Qt.Tool
+                                | QtCore.Qt.FramelessWindowHint
+                                | QtCore.Qt.WindowStaysOnTopHint)
+        pop.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        pop.setObjectName("livewirePanel")
+        pop.setStyleSheet(_QSS)
+        lay = QtWidgets.QVBoxLayout(pop)
+        lay.setContentsMargins(8, 8, 8, 8)
+        head = QtWidgets.QLabel(u"tags  %s" % disp, pop)
+        head.setObjectName("header")
+        lay.addWidget(head)
+        edit = QtWidgets.QLineEdit(pop)
+        edit.setText(", ".join(store.tags().get(disp) or []))
+        lay.addWidget(edit)
+
+        def done():
+            store.set_tags(disp, edit.text().split(","))
+            pop.close()
+        edit.returnPressed.connect(done)
+
+        # the popover takes key focus: suspend the browser's
+        # close-on-deactivate until it's gone, then take focus back
+        self._suspend_close = True
+
+        def restore(_=None):
+            self._suspend_close = False
+            if self.isVisible():
+                _force_key(self)
+        pop.destroyed.connect(restore)
+
+        pop.setFixedWidth(280)
+        pos = QtGui.QCursor.pos()
+        pop.move(pos.x() - 20, pos.y() + 12)
+        pop.show()
+        _force_key(pop)
+        edit.setFocus(QtCore.Qt.OtherFocusReason)
+        self._tag_pop = pop  # keep a ref
+
     # -- commit ------------------------------------------------------------
 
     def _current_socket(self):
@@ -289,7 +429,8 @@ class NodeBrowser(QtWidgets.QWidget):
     # Flame's natively-focused fullscreen app).
     def changeEvent(self, ev):
         if (ev.type() == QtCore.QEvent.ActivationChange
-                and not self.isActiveWindow() and not self._committed):
+                and not self.isActiveWindow() and not self._committed
+                and not getattr(self, "_suspend_close", False)):
             self.close()
         super().changeEvent(ev)
 

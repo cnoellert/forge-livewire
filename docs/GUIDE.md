@@ -145,10 +145,13 @@ your most recent picks break ties. (It also seeds from Flame's own
 search history, so day one already looks like you.) Search matches
 prefer prefixes, then word starts, then anything-inside, then fuzzy.
 
-To pin something permanently to the top, add its display name (e.g.
-`"Lens_Blur - User"`) to the `pinned` list in `~/.config/livewire.json`
-— your usage history lives in the same file, and it travels with your
-home directory.
+The highlighted row shows a **star** and a **tag**, just like Flame's
+own search: click the star to pin the entry to the top of every list
+(click again to unpin); click the tag to give it your own search
+synonyms ("shake, steady" on 2D Transform means typing `shake` finds
+it). Flame's built-in tags already work — livewire reads them from your
+Flame search settings. Pins, tags, and usage history all live in
+`~/.config/livewire.json` and travel with your home directory.
 
 Installed new shaders or saved new bins mid-session? Run
 `livewire.reindex()` in the Flame python console, or just restart.
