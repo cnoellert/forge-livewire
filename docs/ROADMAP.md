@@ -145,14 +145,15 @@ connection, selects XI2 raw button/key events on root once, and
 drains via select() — zero X calls from Flame's threads. Standalone
 validation OUTSIDE Flame passed perfectly: all five arm keys with
 press/release, button-1 during a drag, arm keys detected mid-drag, 40
-events, no errors. **In-Flame validation is blocked:** Flame on the
-test box exited without a coredump during the validation window
-(before the enable call was ever delivered — connection refused), on
-a box with independent instability (chronic hook import errors, an
-AdODIS install_helper_tool SIGABRT). Attribution unresolved.
-**Rule: no further livewire testing on a working artist's box** —
-resume phase 2 only on a disposable host / scratch session / planned
-downtime with no project open. Other open Linux items: `app_active()` is a stub
+events, no errors. **The "Flame crashed during validation" scare was
+false**: Flame never went down (operator-confirmed) — the forge-bridge
+HTTP server inside it died during a hook rescan, which reads
+identically to a host crash from outside (connection refused).
+Diagnostic rule that came out of it: **bridge-unreachable does not
+mean Flame-dead** — confirm with the operator or the process table
+before writing a crash narrative. In-Flame validation of the XI2
+reader remains the open step, to be run supervised with the operator
+ready to kill it. Other open Linux items: `app_active()` is a stub
 (always True); flame-01's user bins/favorites came up empty —
 find where 2026.2.1 keeps user prefs on that box; Wayland untested
 (Flame ships X11).

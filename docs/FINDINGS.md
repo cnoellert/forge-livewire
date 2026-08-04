@@ -197,12 +197,16 @@ panel you want redrawn.
   `XISelectEvents` on root for raw button/key, drained via select() on
   the connection fd. Outside Flame it captured all arm keys
   (press+release), button-1 held, and arm-keys-during-drag — the full
-  gesture vocabulary — with zero errors. **In-Flame validation remains
-  open**: the test Flame exited without a coredump during the window
-  (the enable call was never delivered — connection refused proves it
-  never ran in-process), on a box with independent instability. Do not
-  resume on a working artist's machine; a disposable host or planned
-  downtime is required.
+  gesture vocabulary — with zero errors. In-Flame validation remains
+  the open step.
+- **Bridge-unreachable ≠ Flame-dead.** The forge-bridge HTTP server
+  can die inside a healthy, running Flame (observed after a python
+  hook rescan: port 9999 unbound, Flame fine, operator-confirmed).
+  From outside, that is indistinguishable from a host crash — several
+  of this project's "Flame restarted?" moments were probably bridge
+  outages. Confirm with the operator or the process table before
+  writing a crash narrative; a false one nearly halted the Linux
+  backend for good.
 - macOS is unaffected: the Quartz backend
   (`CGEventSourceButtonState`/`KeyState`) has run for a week with no
   input side effects. User prefs on the test box exposed no `_user.*.batch`
