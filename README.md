@@ -101,6 +101,12 @@ In a gang the fan-in applies to the first link only; the chain then
 continues single-source. Pulling from an *unselected* node ignores the
 selection entirely.
 
+**Multichannel sources fan out by target**: an EXR clip with many
+channel sockets picked onto an Action wires rgba → Back plus one media
+per non-crypto channel (`_alpha` siblings → media Matte); picked onto a
+CryptoMatte it wires one node per crypto family (rank layers →
+`uCryptoNNrgb/a`). Works collapsed or expanded.
+
 **Inside an Action schematic** the same gesture works: drag a link, tap
 **F or M** (equivalent there), release. The browser lists Action's node
 types (Axis, Light, Surface, GMask, …), the header reads

@@ -70,6 +70,16 @@ Select two or more nodes, then pull from **one of the selected ones**:
 Pulling from a node that *isn't* selected ignores the selection — no
 surprises from a leftover selection somewhere in the schematic.
 
+**Multichannel EXRs fan out on their own.** Pull from a multipart EXR
+clip (collapsed or expanded — grab any tab), F, and:
+
+- pick **Action**: `rgba` feeds Back and every other non-crypto channel
+  gets its own media — Z, AO, light selects, the lot — each channel's
+  `_alpha` landing on its media's Matte. A full AOV hookup in one pull.
+- pick **CryptoMatte**: the inverse — one CryptoMatte node per crypto
+  family (MAT, NODE…), each wired `rgba` → Front and its three rank
+  layers + alphas into the crypto inputs, ready to pick mattes.
+
 ### G — gang (build a pipe)
 
 Pull, tap **G**, drop. The browser stays open: every Enter commits a
