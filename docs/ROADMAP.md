@@ -66,7 +66,18 @@ Building blocks and open questions (probe sessions required):
   scan inputs, show input → map-type table with guesses pre-filled,
   Enter wires the lot.
 
-## 4. Source-socket inference
+## 4. Source-socket inference — ✅ shipped 2026-08-04
+
+Calibrated live from seven labeled pulls: standard nodes stack output
+sockets down the right edge at ~21 units/socket centered on the anchor
+(grabs at dx≈+40); expanded multichannel clips at 37.5 units/tab in a
+column at dx≈+112, top tab ~47 units below the centered model, alphas
+sharing their channel's tab. Median of the first three drag samples
+defeats press staleness; dx≈0 (body grabs snap to anchor) gates
+confidence; half-step residual guard rejects ambiguity. The inferred
+socket pre-selects the browser's socket menu. Follow-up: per-type
+geometry table if any node class deviates from the centered model.
+Original brief:
 
 Today the grabbed output socket isn't sensed — `Result`/first is assumed
 (M-mode guesses the matte output). FINDINGS shows a socket grab reads as

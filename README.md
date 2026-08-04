@@ -118,9 +118,10 @@ nodes can be grab sources but are not creatable from the browser yet.
 The header line shows what you're about to do — e.g.
 `from cc1 (to matte)`, or the growing trail in a gang
 (`gang cc1 > Blur > Colour Correct`). If the source node has more than
-one output socket, a menu above the search field lets you override
-which output feeds the connection (defaults to `Result`; in a gang it
-applies to the first link only). Everything a gang commits is already
+one output socket, a menu above the search field picks which output
+feeds the connection — pre-set to the socket you actually grabbed when
+livewire can infer it, else `Result` (in a gang it applies to the
+first link only). Everything a gang commits is already
 in the schematic — ending it changes nothing, and regret is Ctrl+Z.
 
 Arm keys are only watched **while a connection drag is in flight** —
@@ -141,11 +142,12 @@ new bins mid-session, run `livewire.reindex()` (or restart Flame).
 
 ## What it does *not* do (yet)
 
-- **It can't tell which output socket you grabbed.** Pulling the matte
-  noodle vs the result noodle looks the same to livewire today; the
-  source socket is `Result`/first unless you change the menu (or use
-  **M**, which guesses the matte output). Socket inference from the grab
-  position is feasible (see docs/FINDINGS.md) and planned.
+- **Socket inference is geometric, not exact.** The grabbed output is
+  inferred from the grab point's offset to the node anchor (calibrated
+  for standard nodes and expanded multichannel clips — see
+  docs/FINDINGS.md) and pre-selects the socket menu; ambiguous or
+  body grabs fall back to `Result`. Node types with unusual socket
+  layouts may misguess — the menu is always there to correct.
 - **OFX coverage is harvested, not enumerated** — plugins you've used
   (or that appear in a Nuke OFX cache on the machine) are listed;
   a never-used plugin won't be until it's used once. Stale labels from

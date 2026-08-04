@@ -58,8 +58,9 @@ Pull from `plate`, tap **F**, drop, type `bl`, Enter → a Blur wired
   output into a Matte input.
 - **M alone**: the connection goes to the new node's Matte input, and
   the socket menu pre-selects the source's matte output.
-- If the source has several outputs, a menu above the search field lets
-  you pick which one feeds the connection (defaults to `Result`).
+- If the source has several outputs, a menu above the search field
+  picks which one feeds the connection — pre-set to the socket you
+  grabbed (pull the matte tab, get the matte), else `Result`.
 
 ### F with several nodes selected — converge
 
@@ -174,9 +175,11 @@ switch.
 
 - **Arm while the button is down.** Tapping F before you grab or after
   you release does nothing (and bare F is Flame's own Timeline hotkey).
-- **Which output did I grab?** Livewire can't tell yet — it uses
-  `Result` (or your menu pick). Pulling the matte noodle specifically
-  doesn't change the wiring today; use **M** for matte intent.
+- **Which output did I grab?** Livewire infers it from the grab point
+  — pull `OutMatte` and the socket menu arrives pre-set to `OutMatte`;
+  pull a channel tab on an expanded EXR and that channel is pre-set.
+  Body grabs and ambiguous pulls default to `Result`. The menu is
+  always there to correct a guess, and **M** still forces matte intent.
 - **OFX list is learned, not exhaustive** — plugins you've used appear;
   a brand-new plugin shows up after its first manual use.
 - **Wrong node in the header?** Zoomed way out, node anchors crowd

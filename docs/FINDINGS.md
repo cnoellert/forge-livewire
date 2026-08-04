@@ -184,6 +184,25 @@ panel you want redrawn.
   insurance. User prefs on the test box exposed no `_user.*.batch`
   bins under `/opt/Autodesk/user/*` — location TBD.
 
+## Socket geometry (calibrated 2026-08-04, Flame 2027)
+
+Grab offsets vs the matched node's anchor, from labeled pulls:
+
+- **Standard nodes** (Comp): output sockets stack down the right edge,
+  ~**21 units/socket**, vertically **centered on the anchor**; grabs
+  read dx ≈ +37..45. (Retro-explains the day-one action3 sample of
+  (+37,+11) — a top-socket grab.)
+- **Expanded multichannel clips**: tab column at dx ≈ **+112**,
+  **37.5 units/tab** (least-squares over 5 tabs across a 30-tab clip,
+  max residual 0.2 tab), top tab ~47 units below where a centered
+  model predicts. `_alpha` channels do NOT get their own tabs — the
+  visible tab list is the non-alpha outputs.
+- **Body grabs snap to the anchor** (dx≈0) — a free confidence gate:
+  no x-offset, no socket inference.
+- Offsets are in schematic units and therefore **zoom-invariant**.
+- The press-instant sample can be stale (documented earlier); the
+  median of the first three drag samples is robust to it.
+
 ## Gesture classification plan
 
 - Socket grab: early-drag `cursor_position` near a node anchor with the
