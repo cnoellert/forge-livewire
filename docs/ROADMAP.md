@@ -97,9 +97,13 @@ writes), every browser commit records count + timestamp per display
 name. Ranking = match quality → pinned (Flame favorites + the JSON's
 hand-editable `pinned` list) → usage score (livewire count ×4 +
 Flame's search weight) → recency → name. The same file is item 8's
-future config home. Follow-ups: a pin gesture in the browser UI
-(right-click or a key); usage decay if ancient habits ever crowd the
-list.
+future config home. Tag search also matches Flame's own Tags plus a
+per-entry `tags` map in the same file.
+
+**Do not add in-browser pin/tag controls.** Tried twice, crashed Flame
+both times (delegate row icons; then Ctrl+P/Ctrl+T) — see the note in
+browser.py. Any retry needs a scratch project and a soak test.
+Follow-up worth having: usage decay if ancient habits crowd the list.
 
 ## 6. Insert into an existing noodle
 

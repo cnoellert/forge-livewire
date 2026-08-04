@@ -145,18 +145,20 @@ your most recent picks break ties. (It also seeds from Flame's own
 search history, so day one already looks like you.) Search matches
 prefer prefixes, then word starts, then anything-inside, then fuzzy.
 
-**Pin and tag from the keyboard.** With a row highlighted:
+**Pins and tags live in a file.** `~/.config/livewire.json` holds your
+usage history plus two lists you can edit by hand:
 
-- **Ctrl+P** pins it to the top of every list (again to unpin).
-- **Ctrl+T** turns the search field into a tag editor for that entry —
-  type comma-separated synonyms ("shake, steady" on 2D Transform means
-  typing `shake` finds it), Enter saves, Esc cancels and restores your
-  search.
+```json
+{"pinned": ["Lens_Blur - User", "Match Grain"],
+ "tags":   {"2D Transform": ["shake", "steady"]}}
+```
 
-Flame's built-in tags already work — livewire reads them from your
-Flame search settings, so `gaussian` finds Blur out of the box. Pins,
-tags, and usage history live in `~/.config/livewire.json` and travel
-with your home directory.
+Pinned entries sort to the top; tags are extra words that find an
+entry when you search. Flame's own favorites and tags already count —
+livewire reads them from your Flame search settings, so `gaussian`
+finds Blur out of the box. (Livewire deliberately has no in-browser
+pin/tag buttons: adding interactive controls to Flame's Qt proved
+crash-prone, and a stable tool beats a clever one.)
 
 Installed new shaders or saved new bins mid-session? Run
 `livewire.reindex()` in the Flame python console, or just restart.
@@ -185,8 +187,6 @@ switch.
 | **I** on an Action | ingest: media → map-type table, Enter wires the lot |
 | **Enter** | commit the highlighted entry |
 | **↑ / ↓** | move the highlight |
-| **Ctrl+P** | pin / unpin the highlighted entry |
-| **Ctrl+T** | edit the highlighted entry's search tags |
 | **Esc / click away** | close (ends a gang/replicate — already committed) |
 
 ## Tips and honest limits

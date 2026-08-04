@@ -133,13 +133,16 @@ def _rank(query, entry):
     return (m, 0 if pin else 1, -score, -u.get("t", 0), disp.lower())
 
 
-# NOTE: a QStyledItemDelegate drawing clickable star/tag icons on the
-# row was tried and REMOVED — it crashed Flame on click (twice). Qt6
-# dropped QMouseEvent.pos(), and an exception raised inside a delegate
-# propagates through Qt's C++ event dispatch and takes the host down.
-# Pin/tag now ride keyboard shortcuts through the search field's event
-# filter, which has been stable since v0.1. Do not reintroduce
-# delegate-based row controls without testing in a scratch project.
+# NOTE: interactive pin/tag controls were attempted twice and BOTH
+# crashed Flame — first clickable row icons via a QStyledItemDelegate,
+# then Ctrl+P / Ctrl+T through this widget's event filter. Suspected
+# causes: Qt6 dropped QMouseEvent.pos(), exceptions inside a delegate
+# unwind through Qt's C++ dispatch, and singleShot callbacks can fire
+# into a WA_DeleteOnClose widget that is already gone. Whatever the
+# precise mechanism, novel interactive Qt inside this host is not worth
+# the risk. Pins and tags are file-edited in ~/.config/livewire.json;
+# ranking still learns passively from commits (no UI, no exposure).
+# Do not re-add interactive controls without a scratch-project soak.
 
 
 class NodeBrowser(QtWidgets.QWidget):
@@ -158,7 +161,6 @@ class NodeBrowser(QtWidgets.QWidget):
         self._on_commit = on_commit
         self._socket_combo = None
         self._committed = False
-        self._tag_target = None
         self._chain = chain
         self._source = source
         self._trail = [source["name"]] if (source and source.get("name")) \
@@ -239,8 +241,6 @@ class NodeBrowser(QtWidgets.QWidget):
     # -- filtering ---------------------------------------------------------
 
     def _refilter(self, text):
-        if getattr(self, "_tag_target", None) is not None:
-            return  # the field is editing tags, not searching
         ranked = []
         for e in self._entries:
             r = _rank(text, e)
@@ -263,30 +263,6 @@ class NodeBrowser(QtWidgets.QWidget):
     def eventFilter(self, obj, ev):
         if obj is self._edit and ev.type() == QtCore.QEvent.KeyPress:
             key = ev.key()
-            if self._tag_target is not None:
-                if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
-                    self._end_tag_edit(True)
-                    return True
-                if key == QtCore.Qt.Key_Escape:
-                    self._end_tag_edit(False)
-                    return True
-                return False
-            mods = ev.modifiers()
-            ctrlish = mods & (QtCore.Qt.ControlModifier
-                              | QtCore.Qt.MetaModifier)
-            if ctrlish and key in (QtCore.Qt.Key_P, QtCore.Qt.Key_T):
-                item = self._list.currentItem()
-                entry = item.data(QtCore.Qt.UserRole) if item else None
-                if entry:
-                    if key == QtCore.Qt.Key_P:
-                        from . import store
-                        now = store.toggle_pin(entry["display"])
-                        self._flash(u"%s  %s"
-                                    % ("pinned" if now else "unpinned",
-                                       entry["display"]))
-                    else:
-                        self._edit_tags(entry)
-                return True
             if key in (QtCore.Qt.Key_Down, QtCore.Qt.Key_Up):
                 row = self._list.currentRow()
                 row += 1 if key == QtCore.Qt.Key_Down else -1
@@ -301,43 +277,13 @@ class NodeBrowser(QtWidgets.QWidget):
                 return True
         return False
 
-    # -- tags --------------------------------------------------------------
-
-    def _flash(self, msg):
-        """Transient note in the header, then back to normal."""
-        if self._header is None:
-            return
-        self._header.setText(msg)
-        QtCore.QTimer.singleShot(1200, self._update_header)
-
-    def _edit_tags(self, entry):
-        """Inline tag editing: the search field becomes the tag editor
-        (Enter saves, Esc cancels) — no second window, no focus games."""
-        from . import store
-        self._tag_target = entry
-        self._saved_query = self._edit.text()
-        if self._header is None:
-            self._header = QtWidgets.QLabel(self)
-            self._header.setObjectName("header")
-            self._header.setTextFormat(QtCore.Qt.PlainText)
-            self.layout().insertWidget(0, self._header)
-            self._header.show()
-        self._header.setText(u"tags  %s   (Enter saves, Esc cancels)"
-                             % entry["display"])
-        self._edit.setText(", ".join(store.tags().get(
-            entry["display"]) or []))
-        self._edit.selectAll()
-        self._edit.setFocus(QtCore.Qt.OtherFocusReason)
-
-    def _end_tag_edit(self, save):
-        from . import store
-        entry = self._tag_target
-        self._tag_target = None
-        if save and entry is not None:
-            store.set_tags(entry["display"], self._edit.text().split(","))
-        self._update_header()
-        self._edit.setText(getattr(self, "_saved_query", ""))
-        self._edit.setFocus(QtCore.Qt.OtherFocusReason)
+    # NOTE: interactive pin/tag controls were tried TWICE (clickable
+    # row icons, then Ctrl+P / Ctrl+T) and BOTH crashed Flame. Custom
+    # Qt interaction inside this host is not worth the risk: pins and
+    # tags are file-edited in ~/.config/livewire.json instead, and
+    # usage-based ranking (recorded passively on commit) gives most of
+    # the benefit with none of the exposure. Do not re-add without a
+    # scratch-project soak test.
 
     # -- commit ------------------------------------------------------------
 
