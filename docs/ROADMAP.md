@@ -135,13 +135,24 @@ requires items 2 and 5 for feature parity with expectations).
 (`XQueryPointer` button mask, `XQueryKeymap` via keysym→keycode,
 XTest 1px jiggle as the repaint nudge). Validated in production use on
 flame-01 (Rocky 9.5, Flame 2026.2.1, X11 `:1`) — popup takes focus
-with plain `activateWindow`, no NSWindow-style trick needed. **Disabled after a live regression:** livewire's 30 ms
-XQueryPointer/XQueryKeymap loop breaks Flame's keyboard handling —
-Shift died in the Media panel and came back the instant the timer was
-stopped (a read-only backend did not help; the polling is the cause).
-Redesign required: select XInput2 raw events once and drain them, no
-synchronous round trips from Flame's main thread. Test on a
-disposable host only. Other open Linux items: `app_active()` is a stub
+with plain `activateWindow`, no NSWindow-style trick needed. **Take one (polling) disabled after a live regression:** the 30 ms
+XQueryPointer/XQueryKeymap loop broke Flame's Shift key; stopping the
+timer fixed it instantly (read-only access did not help).
+
+**Take two (event-driven, `livewire/xi2.py`) is built and partially
+validated (2026-08-04):** a dedicated thread owns its own X
+connection, selects XI2 raw button/key events on root once, and
+drains via select() — zero X calls from Flame's threads. Standalone
+validation OUTSIDE Flame passed perfectly: all five arm keys with
+press/release, button-1 during a drag, arm keys detected mid-drag, 40
+events, no errors. **In-Flame validation is blocked:** Flame on the
+test box exited without a coredump during the validation window
+(before the enable call was ever delivered — connection refused), on
+a box with independent instability (chronic hook import errors, an
+AdODIS install_helper_tool SIGABRT). Attribution unresolved.
+**Rule: no further livewire testing on a working artist's box** —
+resume phase 2 only on a disposable host / scratch session / planned
+downtime with no project open. Other open Linux items: `app_active()` is a stub
 (always True); flame-01's user bins/favorites came up empty —
 find where 2026.2.1 keeps user prefs on that box; Wayland untested
 (Flame ships X11).

@@ -192,11 +192,17 @@ panel you want redrawn.
   queries only run *during a drag* while the pointer query runs
   always, so `XQueryPointer` at 30 ms on Flame's main thread is the
   prime suspect.
-- **Next design to try (untested):** stop polling. Select XInput2 raw
-  events (`XISelectEvents` on root for RawButtonPress/RawKeyPress) on
-  a dedicated connection and drain them per tick — no synchronous
-  round trips into the X server from Flame's main thread. Needs a
-  disposable host; do not iterate on a working artist's machine.
+- **The XI2 raw-event redesign (`livewire/xi2.py`) works standalone**
+  (2026-08-04, Rocky 9.5): dedicated thread, own connection,
+  `XISelectEvents` on root for raw button/key, drained via select() on
+  the connection fd. Outside Flame it captured all arm keys
+  (press+release), button-1 held, and arm-keys-during-drag — the full
+  gesture vocabulary — with zero errors. **In-Flame validation remains
+  open**: the test Flame exited without a coredump during the window
+  (the enable call was never delivered — connection refused proves it
+  never ran in-process), on a box with independent instability. Do not
+  resume on a working artist's machine; a disposable host or planned
+  downtime is required.
 - macOS is unaffected: the Quartz backend
   (`CGEventSourceButtonState`/`KeyState`) has run for a week with no
   input side effects. User prefs on the test box exposed no `_user.*.batch`
