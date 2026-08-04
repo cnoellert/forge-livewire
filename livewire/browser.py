@@ -217,7 +217,11 @@ class _RowIcons(QtWidgets.QStyledItemDelegate):
                         store.toggle_pin(entry["display"])
                         self._browser._list.viewport().update()
                     else:
-                        self._browser._edit_tags(entry)
+                        # defer out of the mouse event before touching
+                        # focus — doing it synchronously crashed Flame
+                        QtCore.QTimer.singleShot(
+                            0, lambda e=entry:
+                            self._browser._edit_tags(e))
                 return True
         return False
 
@@ -238,6 +242,7 @@ class NodeBrowser(QtWidgets.QWidget):
         self._on_commit = on_commit
         self._socket_combo = None
         self._committed = False
+        self._tag_target = None
         self._chain = chain
         self._source = source
         self._trail = [source["name"]] if (source and source.get("name")) \
@@ -299,6 +304,9 @@ class NodeBrowser(QtWidgets.QWidget):
     def _update_header(self):
         if self._header is None:
             return
+        if not self._trail and not self._chain:
+            self._header.setText(u"")
+            return
         extras = (self._source or {}).get("extra") or []
         back = (u"   back  %s" % ", ".join(e["name"] for e in extras)
                 if extras else u"")
@@ -316,6 +324,8 @@ class NodeBrowser(QtWidgets.QWidget):
     # -- filtering ---------------------------------------------------------
 
     def _refilter(self, text):
+        if getattr(self, "_tag_target", None) is not None:
+            return  # the field is editing tags, not searching
         ranked = []
         for e in self._entries:
             r = _rank(text, e)
@@ -338,6 +348,14 @@ class NodeBrowser(QtWidgets.QWidget):
     def eventFilter(self, obj, ev):
         if obj is self._edit and ev.type() == QtCore.QEvent.KeyPress:
             key = ev.key()
+            if self._tag_target is not None:
+                if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                    self._end_tag_edit(True)
+                    return True
+                if key == QtCore.Qt.Key_Escape:
+                    self._end_tag_edit(False)
+                    return True
+                return False
             if key in (QtCore.Qt.Key_Down, QtCore.Qt.Key_Up):
                 row = self._list.currentRow()
                 row += 1 if key == QtCore.Qt.Key_Down else -1
@@ -355,46 +373,33 @@ class NodeBrowser(QtWidgets.QWidget):
     # -- tags --------------------------------------------------------------
 
     def _edit_tags(self, entry):
-        """Tiny popover editing the entry's custom tags, comma-separated."""
+        """Inline tag editing: the search field becomes the tag editor
+        (Enter saves, Esc cancels) — no second window, no focus games."""
         from . import store
-        disp = entry["display"]
-        pop = QtWidgets.QWidget(None, QtCore.Qt.Tool
-                                | QtCore.Qt.FramelessWindowHint
-                                | QtCore.Qt.WindowStaysOnTopHint)
-        pop.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        pop.setObjectName("livewirePanel")
-        pop.setStyleSheet(_QSS)
-        lay = QtWidgets.QVBoxLayout(pop)
-        lay.setContentsMargins(8, 8, 8, 8)
-        head = QtWidgets.QLabel(u"tags  %s" % disp, pop)
-        head.setObjectName("header")
-        lay.addWidget(head)
-        edit = QtWidgets.QLineEdit(pop)
-        edit.setText(", ".join(store.tags().get(disp) or []))
-        lay.addWidget(edit)
+        self._tag_target = entry
+        self._saved_query = self._edit.text()
+        if self._header is None:
+            self._header = QtWidgets.QLabel(self)
+            self._header.setObjectName("header")
+            self._header.setTextFormat(QtCore.Qt.PlainText)
+            self.layout().insertWidget(0, self._header)
+            self._header.show()
+        self._header.setText(u"tags  %s   (Enter saves, Esc cancels)"
+                             % entry["display"])
+        self._edit.setText(", ".join(store.tags().get(
+            entry["display"]) or []))
+        self._edit.selectAll()
+        self._edit.setFocus(QtCore.Qt.OtherFocusReason)
 
-        def done():
-            store.set_tags(disp, edit.text().split(","))
-            pop.close()
-        edit.returnPressed.connect(done)
-
-        # the popover takes key focus: suspend the browser's
-        # close-on-deactivate until it's gone, then take focus back
-        self._suspend_close = True
-
-        def restore(_=None):
-            self._suspend_close = False
-            if self.isVisible():
-                _force_key(self)
-        pop.destroyed.connect(restore)
-
-        pop.setFixedWidth(280)
-        pos = QtGui.QCursor.pos()
-        pop.move(pos.x() - 20, pos.y() + 12)
-        pop.show()
-        _force_key(pop)
-        edit.setFocus(QtCore.Qt.OtherFocusReason)
-        self._tag_pop = pop  # keep a ref
+    def _end_tag_edit(self, save):
+        from . import store
+        entry = self._tag_target
+        self._tag_target = None
+        if save and entry is not None:
+            store.set_tags(entry["display"], self._edit.text().split(","))
+        self._update_header()
+        self._edit.setText(getattr(self, "_saved_query", ""))
+        self._edit.setFocus(QtCore.Qt.OtherFocusReason)
 
     # -- commit ------------------------------------------------------------
 
