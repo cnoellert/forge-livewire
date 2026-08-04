@@ -18,9 +18,10 @@ implementation detail below.
 
 ## Requirements
 
-- Flame **2026.x**, on **macOS** (developed on 2026.2.2) or **Rocky
-  Linux with X11** (validated on 2026.2.1 / Rocky 9.5). No external
-  daemons, no special permissions on either platform.
+- Flame **2026.x or 2027**, on **macOS** (developed on 2026.2.2,
+  validated on 2027) or **Rocky Linux with X11** (validated on
+  2026.2.1 / Rocky 9.5). No external daemons, no special permissions
+  on either platform.
 - macOS additionally needs PyObjC vendored into the repo by a one-time
   bootstrap (below). Linux needs nothing beyond the system X libraries
   (`libX11`, `libXtst`) — the input backend is pure ctypes.

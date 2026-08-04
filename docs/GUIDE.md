@@ -32,17 +32,17 @@ armed in every session, macOS and Rocky Linux (X11) alike.
 
 1. **Pull a noodle** out of any node's output socket — a completely
    normal connection drag.
-2. **While still holding**, tap an arm key: **F**, **G**, or **R**
-   (add **M** for matte wiring — see below).
+2. **While still holding**, tap an arm key: **F**, **G**, **R**, or
+   **I** (add **M** for matte wiring — see below).
 3. **Let go over empty schematic space.** The noodle cancels, and the
    search popup appears right where you dropped it.
 4. **Type to narrow, Enter to commit.** ↑/↓ choose, Esc or clicking
    anywhere else cancels.
 
-The arm keys are only watched mid-drag. F, G, R, and M all keep their
-normal Flame meanings the rest of the time.
+The arm keys are only watched mid-drag. F, G, R, I, and M all keep
+their normal Flame meanings the rest of the time.
 
-## The three verbs
+## The four verbs
 
 Think of it as: **F converges, G chains, R replicates, I ingests.**
 
