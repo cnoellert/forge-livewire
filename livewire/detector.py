@@ -407,10 +407,12 @@ def _commit_batch(entry, out_socket, cp, source, mode):
             ins = [str(s) for s in _attr(new.input_sockets)]
         except Exception:
             pass
-        # Channel fan-out: a multichannel source (EXR clip etc.) picked
-        # onto an Action or CryptoMatte dispatches on the target, like
-        # every other converge. Only when no multi-select is in play.
-        if not (source.get("extra") or []):
+        # Channel fan-out: a multichannel CLIP picked onto an Action or
+        # CryptoMatte dispatches on the target, like every other
+        # converge. Gated on the source actually being a multichannel
+        # clip — a plain "has 3+ outputs" test caught chained picks off
+        # a CryptoMatte (Result + OutMatte1-4) and fanned those out.
+        if source.get("multichannel") and not (source.get("extra") or []):
             try:
                 new_type = str(_attr(new.type))
             except Exception:
@@ -586,9 +588,10 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
                 # Multi-select fan-in (Action media / back pairs)
                 # applies to the FIRST pick only; chained picks must
                 # never see the original selection.
-                if not ch["first"] and src_ctx and "extra" in src_ctx:
+                if not ch["first"] and src_ctx and (
+                        "extra" in src_ctx or "multichannel" in src_ctx):
                     src_ctx = {k: v for k, v in src_ctx.items()
-                               if k != "extra"}
+                               if k not in ("extra", "multichannel")}
                     ch["source"] = src_ctx
                 if parallel and use_sock:
                     # per-chain sanity: only honor the socket menu where
@@ -717,6 +720,8 @@ def _decide_surface():
                           if n == src["name"])
             offs = [(round(sx - ax), round(sy - ay))
                     for (sx, sy) in bat_samples[:3]]
+            if src["name"] in _bat_meta:
+                src["multichannel"] = True
             gs = _infer_socket(src.get("sockets") or [], (ax, ay),
                                bat_samples, _bat_meta.get(src["name"]))
             if gs:
