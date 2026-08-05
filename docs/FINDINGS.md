@@ -247,7 +247,23 @@ exonerated and the truth two layers away:
 Diagnostic kit for next time: watch the server modifier mask from an
 ssh X client while the operator (a) rests hands, (b) holds Shift and
 clicks. Stuck bit at rest → tap that modifier. Clean chords ignored →
-Flame-internal desync → tap all modifiers with Flame focused.
+Flame-internal desync → tap all modifiers with Flame focused. (macOS
+equivalent: `CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState)`.)
+
+**Epilogue (same day): the symptom appeared on macOS too — no PCoIP.**
+System modifier state clean, Flame ignoring Shift: the identical
+second-layer failure. Unified conclusion: **Flame's internal modifier
+latch desyncs when modifier transitions land during focus churn, on
+any platform** — and livewire's popup, which forcibly takes and
+returns key-window focus on every open/close, is a potent churn
+trigger (PCoIP merely adds a second, server-level stranding failure on
+top). Livewire is disabled on both machines pending a fix. Candidate
+fix (macOS, untested): on popup close, read the true
+CGEventSource flags and post a synthetic `NSFlagsChanged` event to
+Flame's main window — the same in-process posting mechanism as the
+repaint nudge — so Flame's latch resyncs to reality. No
+injection-safe Linux equivalent is known; the Linux answer may be
+Qt-side (avoid taking key-window at all?) or acceptance.
 - **Bridge-unreachable ≠ Flame-dead.** The forge-bridge HTTP server
   can die inside a healthy, running Flame (observed after a python
   hook rescan: port 9999 unbound, Flame fine, operator-confirmed).
