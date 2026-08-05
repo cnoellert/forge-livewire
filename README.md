@@ -12,6 +12,13 @@ and native to Batch.
 Flame's own node search (the Tools/Learn popup) can't be invoked from a
 noodle. This closes that gap.
 
+> **Status (2026-08-04): temporarily disabled on both dev machines.**
+> An open bug — livewire's poll timer breaks Shift-select in Flame's
+> Media panel — is under investigation. See
+> [docs/PASSOFF.md](docs/PASSOFF.md) for the exact state, what is
+> established, and the next test to run. Features are unaffected and
+> fully working; this is an input-layer interference issue.
+
 **Artists: start with the [Artist Guide](docs/GUIDE.md)** — gestures,
 the three verbs, workflow examples, and tips, with none of the
 implementation detail below.
