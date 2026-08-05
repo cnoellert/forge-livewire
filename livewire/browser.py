@@ -335,15 +335,23 @@ class NodeBrowser(QtWidgets.QWidget):
     def closeEvent(self, ev):
         if self in _open:
             _open.remove(self)
-        # hand keyboard focus back — on X11 a closed popup can otherwise
-        # leave X input focus on a destroyed window
         import sys
         if sys.platform != "darwin":
+            # hand keyboard focus back — on X11 a closed popup can
+            # otherwise leave X input focus on a destroyed window
             try:
                 from . import hid
                 hid.release_focus()
             except Exception:
                 pass
+        # resync Flame's internal modifier latch after our focus churn
+        # (the Shift saga) — deferred, module function only: never a
+        # bound method of a WA_DeleteOnClose widget
+        try:
+            from . import hid
+            QtCore.QTimer.singleShot(80, hid.resync_modifiers)
+        except Exception:
+            pass
         super().closeEvent(ev)
 
 

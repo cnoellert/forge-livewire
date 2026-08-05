@@ -68,6 +68,46 @@ if DARWIN:
         except Exception:
             return None
 
+    def resync_modifiers():
+        """Post synthetic NSFlagsChanged events carrying the TRUE
+        hardware modifier flags to Flame's main window. Flame tracks
+        modifiers with an internal latch fed by the events it receives;
+        modifier transitions that land during popup focus churn never
+        reach it and the latch drifts (the Shift saga — see FINDINGS).
+        One event per modifier keycode, all carrying the real combined
+        state, resettles every latch. Same in-process posting mechanism
+        as the repaint nudge."""
+        try:
+            import AppKit
+            flags = int(Quartz.CGEventSourceFlagsState(_ST))
+            mask = (0x20000 | 0x40000 | 0x80000    # shift/ctrl/option
+                    | 0x100000 | 0x10000)          # command/capslock
+            nsflags = flags & mask
+            app = AppKit.NSApplication.sharedApplication()
+            main = None
+            for w in app.windows():
+                try:
+                    f = w.frame()
+                    if w.isVisible() and (
+                            main is None
+                            or f.size.width > main.frame().size.width):
+                        main = w
+                except Exception:
+                    pass
+            if main is None:
+                return
+            mtype = getattr(AppKit, "NSEventTypeFlagsChanged", 12)
+            # both shifts, ctrls, options, commands
+            for keycode in (56, 60, 59, 62, 58, 61, 55, 54):
+                ev = (AppKit.NSEvent.
+                      keyEventWithType_location_modifierFlags_timestamp_windowNumber_context_characters_charactersIgnoringModifiers_isARepeat_keyCode_(
+                          mtype, (0, 0), nsflags, 0.0,
+                          main.windowNumber(), None, "", "",
+                          False, keycode))
+                app.postEvent_atStart_(ev, False)
+        except Exception:
+            pass
+
     def start():
         pass  # Quartz state queries need no reader thread
 
@@ -157,3 +197,6 @@ else:
 
     def release_focus():
         pass
+
+    def resync_modifiers():
+        pass  # no injection-safe X equivalent is known
