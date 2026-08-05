@@ -344,14 +344,6 @@ class NodeBrowser(QtWidgets.QWidget):
                 hid.release_focus()
             except Exception:
                 pass
-        # resync Flame's internal modifier latch after our focus churn
-        # (the Shift saga) — deferred, module function only: never a
-        # bound method of a WA_DeleteOnClose widget
-        try:
-            from . import hid
-            QtCore.QTimer.singleShot(80, hid.resync_modifiers)
-        except Exception:
-            pass
         super().closeEvent(ev)
 
 

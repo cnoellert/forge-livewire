@@ -223,11 +223,6 @@ class MapperDialog(QtWidgets.QWidget):
     def closeEvent(self, ev):
         if self in _open:
             _open.remove(self)
-        try:
-            from . import hid
-            QtCore.QTimer.singleShot(80, hid.resync_modifiers)
-        except Exception:
-            pass
         super().closeEvent(ev)
 
 

@@ -74,6 +74,8 @@ _btn = 0
 _armed = False
 _to_front = False
 _to_matte = False
+_drag_live = False     # the drag has actually MOVED in schematic
+                       # space: only then may we query key state
 _gang = False          # G tapped during the drag: chain mode
 _chain_sel = False     # C tapped: parallel chains across the selection
 _ingest = False        # A tapped: Action map-ingest table
@@ -740,7 +742,7 @@ def _decide_surface():
 
 def _tick():
     global _btn, _armed, _to_front, _to_matte, _gang, _chain_sel, _pairs
-    global _ingest, _bat_types, _bat_meta
+    global _ingest, _bat_types, _bat_meta, _drag_live
     global _bat_map, _act_map, _act_name, _act_obj, _surface, _source, err
     try:
         btn = 1 if hid.button_down() else 0
@@ -783,6 +785,7 @@ def _tick():
             else:
                 _bat_map, _act_map = [], []
                 _act_name, _act_obj = None, None
+            _drag_live = False
             _pairs.append((_cpos_of(flame.batch),
                            _cpos_of(_act_obj) if _act_obj else None))
         elif btn:
@@ -790,7 +793,15 @@ def _tick():
                     _cpos_of(_act_obj) if _act_obj else None)
             if not _pairs or pair != _pairs[-1]:
                 _pairs.append(pair)
-            if _bat_map or _act_map:
+                if len(_pairs) >= 2:
+                    _drag_live = True
+            # CRITICAL: never query key state unless the pointer is
+            # actually dragging in a schematic. CGEventSourceKeyState
+            # (and XQueryKeymap) disturb Flame's modifier handling —
+            # querying during a plain modifier-click broke shift-select
+            # in the Media panel for a week. A Media-panel click leaves
+            # cursor_position frozen, so this gate silences us there.
+            if (_bat_map or _act_map) and _drag_live:
                 f_down = hid.key_down(KEY_FRONT)
                 m_down = hid.key_down(KEY_MATTE)
                 g_down = hid.key_down(KEY_GANG)
