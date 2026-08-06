@@ -518,15 +518,14 @@ ACTION_CREATE_ALIASES = {"Surface": "Extended Bicubic"}
 
 
 def _commit_action(entry, cp, source, action_name):
-    """Create + link one pick inside the Action; returns the new node."""
+    """Create + link one pick inside the Action.
+
+    Returns (new_node, via_axis): via_axis is True when the create
+    auto-spawned a parent axis (surfaces do) — the caller budgets the
+    chain step for the extra row."""
     a = flame.batch.get_node(action_name)
     payload = ACTION_CREATE_ALIASES.get(entry["payload"], entry["payload"])
     new = a.create_node(payload)
-    try:
-        new.pos_x = int(cp[0])
-        new.pos_y = int(cp[1])
-    except Exception:
-        pass
     # Some creates auto-spawn a parent (a surface arrives with its own
     # axis). Flame's hand-made convention is source -> auto-axis ->
     # surface in a vertical stack, so route the source link into the
@@ -540,27 +539,41 @@ def _commit_action(entry, cp, source, action_name):
             link_target = autos[0]
     except Exception:
         pass
-    placed = False
-    if source and source.get("name"):
-        src = a.get_node(source["name"])
-        if src is not None:
-            a.connect_nodes(src, link_target)
-            if link_target is not new:
-                try:
-                    sx = float(_attr(src.pos_x))
-                    sy = float(_attr(src.pos_y))
-                    link_target.pos_x = int((sx + cp[0]) / 2)
-                    link_target.pos_y = int((sy + cp[1]) / 2)
-                    placed = True
-                except Exception:
-                    pass
-    if link_target is not new and not placed:
+    src = (a.get_node(source["name"])
+           if source and source.get("name") else None)
+    nx, ny = int(cp[0]), int(cp[1])
+    if src is not None and link_target is not new:
         try:
-            link_target.pos_x = int(cp[0])
-            link_target.pos_y = int(cp[1]) + CHAIN_DY_ACTION // 2
+            # the rig needs two rows below its source — a drop closer
+            # than that crams the auto-axis into the source node
+            ny = min(ny, int(float(_attr(src.pos_y))
+                             - 2 * CHAIN_DY_ACTION))
         except Exception:
             pass
-    return new
+    try:
+        new.pos_x = nx
+        new.pos_y = ny
+    except Exception:
+        pass
+    placed = False
+    if src is not None:
+        a.connect_nodes(src, link_target)
+        if link_target is not new:
+            try:
+                sx = float(_attr(src.pos_x))
+                sy = float(_attr(src.pos_y))
+                link_target.pos_x = int((sx + nx) / 2)
+                link_target.pos_y = int((sy + ny) / 2)
+                placed = True
+            except Exception:
+                pass
+    if link_target is not new and not placed:
+        try:
+            link_target.pos_x = nx
+            link_target.pos_y = ny + CHAIN_DY_ACTION // 2
+        except Exception:
+            pass
+    return new, link_target is not new
 
 
 def _nudge_burst(base, step=(1, 0)):
@@ -655,8 +668,9 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
                     if use_sock not in (src_ctx.get("sockets") or []):
                         use_sock = None
                 if is_action:
-                    new = _commit_action(entry, ch["cp"], src_ctx,
-                                         surface["action"])
+                    new, via_axis = _commit_action(entry, ch["cp"],
+                                                   src_ctx,
+                                                   surface["action"])
                     outs = []
                 else:
                     new = _commit_batch(entry, use_sock, ch["cp"],
@@ -671,8 +685,13 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
                 # continues single-source from the new node
                 ch["source"] = {"name": name, "sockets": outs}
                 if is_action:
+                    # a commit that arrived with its own axis occupies
+                    # two rows (axis + node) — budget the next drop
+                    # accordingly or chained surfaces stack into each
+                    # other (2026-08-05 screenshot)
+                    dy = CHAIN_DY_ACTION * (2 if via_axis else 1)
                     ch["cp"] = (float(_attr(new.pos_x)),
-                                float(_attr(new.pos_y)) - CHAIN_DY_ACTION)
+                                float(_attr(new.pos_y)) - dy)
                 else:
                     ch["cp"] = (float(_attr(new.pos_x)) + CHAIN_DX_BATCH,
                                 float(_attr(new.pos_y)))
