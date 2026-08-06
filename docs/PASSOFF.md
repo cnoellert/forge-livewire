@@ -1,92 +1,72 @@
-# Passoff — 2026-08-04 (end of the "Shift" session)
+# Passoff — 2026-08-05 (the Shift bug is FIXED)
 
-Read this first, then [FINDINGS.md](FINDINGS.md). It is written for a
-session starting cold.
+Read this first, then [FINDINGS.md](FINDINGS.md) — especially its
+"isolation ladder (2026-08-05)" section, which is the authoritative
+account of the bug that dominated the last week.
 
 ## State right now
 
-- **Livewire is DISABLED on both machines.** Hooks moved to
-  `/tmp/livewire_hook.py.disabled` on portofino (macOS) and flame-01
-  (Rocky). Running sessions had the detector stopped and modules
-  unloaded. Nothing auto-loads on restart.
-- Repo is clean and pushed; tip is v1.2.0 (`4cd92dd`). Tag `v1.0.0`
-  marks the last release believed fully healthy in daily use.
-- **Everything about livewire's *features* works** — the whole verb
-  grammar (F/G/R/I), channel fan-out, socket inference, the index,
-  Action support — on macOS and (validated) on Linux via evdev.
-  Nothing below is about features.
+- **The Media-panel shift-select bug is root-caused and fixed**
+  (v1.3.0). Root cause: any Flame node-API access (`current_node`,
+  `nodes` iteration, attr reads — each independently sufficient)
+  performed synchronously while Flame processes a click breaks that
+  click's shift-anchor handling in the Media panel. NOT the Quartz
+  key/button polling, NOT the timer, NOT `cursor_position` reads,
+  NOT popup focus churn. Proven by a 6-rung isolation ladder with
+  repeat trials; see FINDINGS.
+- **The fix:** `detector._tick` touches zero Flame node API at button
+  press. The surface snapshot is deferred to the drag-live
+  transition (two distinct `cursor_position` samples with the button
+  down), which only genuine schematic drags produce. Media-panel
+  clicks never touch the node API at all.
+- **Verified live on portofino** (macOS, Flame 2026.2.2, real finish
+  project): shift-select clean with the full detector running;
+  noodle-drop verbs confirmed working. Action-schematic drag not yet
+  explicitly re-tested post-fix (design says it works: both cursor
+  feeds stream during Action drags; verify when convenient).
+- **Livewire is RE-ENABLED on portofino** (hook symlink restored to
+  `/opt/Autodesk/shared/python/livewire_hook.py`, detector running in
+  the live session).
+- **flame-01 (Linux) stays disabled** — not because of this bug
+  (fixed), but because of the two unexplained hard crashes noted in
+  `livewire/hid.py`. It needs a soak test on a disposable host before
+  `LINUX_ENABLED` flips. Note: FINDINGS' "any X observation breaks
+  Flame" conclusion is now suspect (all those trials carried the
+  press-snapshot confound); the X backends could be retested with
+  v1.3.0 if evdev ever becomes insufficient.
 
-## The one open bug
+## Loose ends, in priority order
 
-**With livewire's detector timer running, Shift-select stops working
-in Flame's Media panel. Stop the timer and it works again instantly,
-same session, no restart.** Reproduced on macOS (portofino) and Linux
-(flame-01), i.e. across two completely different input backends.
+1. **Action-schematic regression pass** — one R/G gang and one
+   converge inside an Action, confirming the deferred snapshot arms
+   correctly there.
+2. **flame-01 soak test** on a scratch box/session before re-enabling
+   Linux (crashes, not the Shift bug, are the blocker).
+3. **forge-flame-kb correction** — its entry on X polling breaking
+   Flame keyboard handling inherits the confound; update it with the
+   ladder result (edit docs/*.md, then rebuild chunks + index per
+   that repo's README).
+4. The `_bat_meta` staleness caveat is unchanged: `cursor_position`
+   can be stale at the press instant (~100–150 ms catch-up), which is
+   why drag-live requires two samples — do not "optimize" that away.
 
-### What is actually established (trust only this)
-
-1. Timer running → Media-panel shift-select broken. Timer stopped →
-   fixed immediately, no restart. Clean same-session bisect, both
-   directions, macOS.
-2. The symptom is **specific to the Media panel**; schematic work is
-   unaffected (nobody holds a modifier there).
-3. On flame-01 there was *also* a genuine PCoIP-stranded phantom Ctrl
-   in the X server (server modifier mask showed `Ctrl` at rest). That
-   is a **separate, real** issue — cure: tap both Ctrl keys. Do not
-   let it contaminate this bug again.
-4. A timer polling **only** `CGEventSourceButtonState` (no key-state
-   calls) did **not** break Shift — **single trial, treat as weak.**
-5. Gating key queries behind "the drag has moved in schematic space"
-   (v1.2.0's `_drag_live`) did **NOT** fix it. So either the gate
-   fails to suppress the queries in the shift-click path, or (4) was
-   a false negative and something else in the tick is responsible.
-
-### Theories already disproven (do not re-litigate)
-
-- Popup focus churn / `makeKeyAndOrderFront` — the bug reproduces with
-  the timer alone and **no popup ever opened**.
-- X-specific mechanisms (`XSetInputFocus`, XTest, XI2 selection) —
-  macOS reproduces the same symptom with no X anywhere.
-- Flame-internal modifier latch needing a "resync" — a resync that
-  posted true `NSFlagsChanged` did nothing; mechanism removed.
-- PCoIP alone — macOS has no PCoIP and still shows it.
-
-### The next step (do this, don't theorise)
-
-Run a **three-rung isolation ladder** on portofino, each rung held
-long enough for the operator to test Media-panel shift-select
-properly, one variable at a time:
-
-1. A `QTimer` at 30 ms whose callback does **nothing at all**.
-2. Same timer + `CGEventSourceButtonState` only.
-3. Same timer + button + `CGEventSourceKeyState` calls.
-
-Whichever rung first breaks Shift names the culprit. If rung 1 breaks
-it, the problem is the main-thread timer itself and the whole polling
-design needs replacing (out-of-process helper feeding state over the
-bridge is the fallback design). Do not ship a fix off a single trial —
-that mistake was made twice in this session.
-
-## Standing rules earned the hard way
+## Standing rules (unchanged, still earned the hard way)
 
 - **Bridge-unreachable ≠ Flame-dead.** Confirm with the operator.
-- **Never test on a working artist's box** without saying so and
-  getting explicit consent for that session.
-- **One variable per test**, and re-test before believing a result.
-- Livewire's Linux backend (`evdev_reader.py`) is validated and safe
-  from an input-capture standpoint; `LINUX_ENABLED` is False only
-  because of this bug plus two unexplained crashes on flame-01 (no
-  coredumps; that box also has broken third-party hooks and an
-  installer daemon crash of its own).
+- **Never test on a working artist's box** without explicit consent
+  for that session.
+- **One variable per test; repeat before believing.** The ladder
+  worked precisely because of this; v1.2.0 shipped off a confounded
+  single trial and blamed the wrong call for a week.
+- The bridge's `/exec` runs code on its HTTP thread by default — Qt
+  objects (timers!) created there never fire. Pass
+  `main_thread: true` or wrap in `flame.schedule_idle_event`, and
+  remember idle events drain only on Flame UI activity (nudge the UI).
 
-## Re-enabling later
+## Disable in an emergency
 
 ```bash
-# macOS
-mv /tmp/livewire_hook.py.disabled /opt/Autodesk/shared/python/livewire_hook.py
-# flame-01 (also needs LINUX_ENABLED=True in livewire/hid.py)
-ssh flame-01 'mv /tmp/livewire_hook.py.disabled /opt/Autodesk/shared/python/livewire_hook.py'
+mv /opt/Autodesk/shared/python/livewire_hook.py /tmp/livewire_hook.py.disabled
 ```
 
-Bridge one-liner to stop a running instance at any time:
-`livewire.uninstall()` (stops detector and any reader thread).
+Bridge one-liner to stop a running instance: `livewire.uninstall()`.

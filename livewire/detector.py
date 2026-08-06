@@ -740,6 +740,46 @@ def _decide_surface():
     return {"kind": "batch"}, src
 
 
+def _snapshot_surfaces():
+    """The press-time burst, deferred to the drag-live transition.
+
+    Runs only once the pointer has produced two distinct
+    cursor_position samples with the button down — i.e. a genuine
+    schematic drag (Batch or Action: both cursor feeds stream during
+    either; off-schematic both freeze). Never runs for Media-panel
+    clicks, whose cursor_position stays frozen. See the CRITICAL note
+    in _tick.
+    """
+    global _bat_types, _bat_map, _bat_meta, _act_obj, _act_name, _act_map
+    if not hid.app_active():
+        return
+    _bat_types = {}
+    _bat_map = _snapshot(_attr(flame.batch.nodes), _bat_types)
+    _bat_meta = {}
+    for n in _attr(flame.batch.nodes):
+        try:
+            if str(_attr(n.type)) != "Clip":
+                continue
+            nsock = len(_attr(n.output_sockets))
+            if nsock <= 2:
+                continue
+            col = True
+            try:
+                col = bool(_attr(n.collapsed))
+            except Exception:
+                pass
+            _bat_meta[str(_attr(n.name))] = (nsock, col)
+        except Exception:
+            pass
+    _act_obj = _current_action()
+    if _act_obj is not None:
+        _act_name = str(_attr(_act_obj.name))
+        _act_map = (_snapshot(_attr(_act_obj.nodes))
+                    + _snapshot(_attr(_act_obj.media_nodes)))
+    else:
+        _act_name, _act_map = None, []
+
+
 def _tick():
     global _btn, _armed, _to_front, _to_matte, _gang, _chain_sel, _pairs
     global _ingest, _bat_types, _bat_meta, _drag_live
@@ -747,6 +787,16 @@ def _tick():
     try:
         btn = 1 if hid.button_down() else 0
         if btn and not _btn:
+            # CRITICAL: touch NOTHING in the Flame node API at press.
+            # The 2026-08-05 isolation ladder proved that any
+            # PyBatch/PyNode access made while Flame is processing a
+            # click (current_node, nodes iteration, attr reads — each
+            # independently sufficient) breaks shift-select in the
+            # Media panel. Quartz key/button polling and
+            # flame.batch.cursor_position reads are proven safe under
+            # sustained 30 ms polling. The snapshot is deferred to the
+            # drag-live transition below; a Media-panel click leaves
+            # cursor_position frozen, so it never triggers there.
             _pairs = []
             _armed = False
             _to_front = False
@@ -756,51 +806,22 @@ def _tick():
             _ingest = False
             _source = None
             _surface = None
-            if hid.app_active():
-                _bat_types = {}
-                _bat_map = _snapshot(_attr(flame.batch.nodes), _bat_types)
-                _bat_meta = {}
-                for n in _attr(flame.batch.nodes):
-                    try:
-                        if str(_attr(n.type)) != "Clip":
-                            continue
-                        nsock = len(_attr(n.output_sockets))
-                        if nsock <= 2:
-                            continue
-                        col = True
-                        try:
-                            col = bool(_attr(n.collapsed))
-                        except Exception:
-                            pass
-                        _bat_meta[str(_attr(n.name))] = (nsock, col)
-                    except Exception:
-                        pass
-                _act_obj = _current_action()
-                if _act_obj is not None:
-                    _act_name = str(_attr(_act_obj.name))
-                    _act_map = (_snapshot(_attr(_act_obj.nodes))
-                                + _snapshot(_attr(_act_obj.media_nodes)))
-                else:
-                    _act_name, _act_map = None, []
-            else:
-                _bat_map, _act_map = [], []
-                _act_name, _act_obj = None, None
+            _bat_types = {}
+            _bat_meta = {}
+            _bat_map, _act_map = [], []
+            _act_name, _act_obj = None, None
             _drag_live = False
-            _pairs.append((_cpos_of(flame.batch),
-                           _cpos_of(_act_obj) if _act_obj else None))
+            _pairs.append((_cpos_of(flame.batch), None))
         elif btn:
             pair = (_cpos_of(flame.batch),
                     _cpos_of(_act_obj) if _act_obj else None)
             if not _pairs or pair != _pairs[-1]:
                 _pairs.append(pair)
-                if len(_pairs) >= 2:
+                if len(_pairs) >= 2 and not _drag_live:
                     _drag_live = True
-            # CRITICAL: never query key state unless the pointer is
-            # actually dragging in a schematic. CGEventSourceKeyState
-            # (and XQueryKeymap) disturb Flame's modifier handling —
-            # querying during a plain modifier-click broke shift-select
-            # in the Media panel for a week. A Media-panel click leaves
-            # cursor_position frozen, so this gate silences us there.
+                    _snapshot_surfaces()
+            # Key-state queries proved harmless in the ladder (rung 3),
+            # but there is no reason to poll them outside a live drag.
             if (_bat_map or _act_map) and _drag_live:
                 f_down = hid.key_down(KEY_FRONT)
                 m_down = hid.key_down(KEY_MATTE)

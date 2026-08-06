@@ -220,7 +220,8 @@ panel you want redrawn.
   virtual input devices inject at the *kernel* level, so evdev sees
   remote users (an XTEST-injecting remote stack would be invisible).
 
-## The Shift saga, resolved (2026-08-04)
+## The Shift saga, resolved (2026-08-04) — SUPERSEDED, see the
+## 2026-08-05 isolation ladder below for the actual root cause
 
 A week of "livewire breaks Shift" ended with every transport
 exonerated and the truth two layers away:
@@ -264,6 +265,70 @@ Flame's main window — the same in-process posting mechanism as the
 repaint nudge — so Flame's latch resyncs to reality. No
 injection-safe Linux equivalent is known; the Linux answer may be
 Qt-side (avoid taking key-window at all?) or acceptance.
+## The Shift bug, actually resolved: the isolation ladder (2026-08-05)
+
+The Media-panel shift-select breakage was root-caused on portofino
+(macOS, Flame 2026.2.2) with a live isolation ladder — one variable
+per rung, each rung a 30 ms main-thread QTimer, operator testing
+Media-panel shift-select at every rung, recovery confirmed after
+every break, breaking rungs repeated before being believed.
+
+**Exonerated (all clean under sustained, ungated 30 ms polling):**
+
+1. The bare main-thread QTimer itself.
+2. `CGEventSourceButtonState` every tick.
+3. `CGEventSourceKeyState` — all five arm vkeys, every tick,
+   unconditionally. (The v1.2.0 "CRITICAL" comment blamed exactly
+   this. It was wrong.)
+4. `flame.batch.cursor_position` reads every tick, with live
+   schematic values latched.
+5. `AppKit.NSApp.isActive()` every tick.
+
+**Guilty — Flame node-API access during click processing.** Each of
+these, alone, performed synchronously on the press transition, breaks
+Media-panel shift-select (and stopping the timer restores it
+instantly, same session):
+
+- a single `flame.batch.current_node` read (confirmed twice), or
+- iterating `flame.batch.nodes` with name/pos/type attr reads
+  (confirmed independently).
+
+Batch size does not matter — the breaking batch had **2 nodes**. The
+mechanism is not load; **any PyBatch/PyNode access made while Flame
+is processing a click corrupts that click's shift-anchor handling in
+the Media panel.** `flame.batch.cursor_position` is notably NOT in
+the guilty class — it polls clean (rung 4), which is what makes the
+fix possible.
+
+**Why v1.2.0 failed:** its `_drag_live` gate silenced the (innocent)
+Quartz key queries but still ran the (guilty) node snapshot on every
+button press.
+
+**The fix (v1.3.0):** the press transition touches zero Flame node
+API. The full surface snapshot (`_snapshot_surfaces`) is deferred to
+the drag-live transition — two distinct `cursor_position` samples
+with the button down, which only a genuine schematic drag produces
+(both cursor feeds stream during Batch *and* Action drags;
+off-schematic both freeze — see the context-detection finding above).
+Media-panel clicks never trigger any node-API call at all. Verified
+live 2026-08-05: shift-select clean with the full detector running,
+noodle-drop verbs working.
+
+**Fallout for earlier conclusions:**
+
+- The 2026-08-04 "internal modifier latch desync" narrative and the
+  popup-focus-churn theory are superseded for THIS bug (the ladder
+  reproduced it with no popup ever opening). The PCoIP
+  server-level stranded-modifier failure remains real and separate.
+- The Linux conclusion "any X-protocol input observation from inside
+  Flame's process disturbs this stack" is now **suspect**: every
+  Linux trial behind it ran the full detector, i.e. the press-time
+  Flame-API snapshot was present in all of them — the same confound
+  that misled macOS for a week. The X backends deserve a retest with
+  the v1.3.0 deferred snapshot before the X road is declared closed.
+  (evdev remains the shipping Linux backend regardless; it needs no
+  X and is validated.)
+
 - **Bridge-unreachable ≠ Flame-dead.** The forge-bridge HTTP server
   can die inside a healthy, running Flame (observed after a python
   hook rescan: port 9999 unbound, Flame fine, operator-confirmed).
