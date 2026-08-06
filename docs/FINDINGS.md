@@ -90,6 +90,28 @@ Live cursor position in **schematic space**, same coordinate system as
   `None`, so calling them raises `TypeError: 'NoneType' object is not
   callable` (a confusing signature worth remembering). Use the global
   `flame.delete(node)` instead.
+- **Surfaces (probed live 2026-08-05, 2026.2.1):**
+  `create_node("Surface")` RAISES even though "Surface" appears in
+  `node_types` — it is an abstract label. The only creatable surface
+  is `create_node("Extended Bicubic")`, whose node then reports
+  `.type == "Surface"`. It auto-spawns a parent Axis; Flame's
+  hand-made convention is source → auto-axis → surface, so livewire
+  routes the source link into the auto-parent (`node.parents()` — a
+  METHOD, not a property — returns exactly the auto-spawned parents
+  on a fresh node) and places it midway. **Surface flavor
+  (Image / Bilinear / Perspective / Extended Bicubic) is pure GUI
+  state, invisible to Python in both directions**: no creation name,
+  no create-time argument, no attribute exposes it, and two surfaces
+  of different flavors dump byte-for-byte identical API state
+  (verified by flipping the dropdown live and re-dumping).
+  `add_media()` spawns the full image rig (surface + axis inside,
+  Action Media node batch-side) — the media route is the only
+  scriptable path that resembles "Image".
+- **Per-node `selected` DOES work inside Action** — earlier claim of
+  "no queryable selection inside Action" is wrong for node attributes:
+  `n.selected` reads the schematic selection fine (verified live).
+  What Action lacks is a `selected_nodes` collection on the
+  PyActionNode itself.
 
 ## Indexing sources (probed 2026-07-29)
 

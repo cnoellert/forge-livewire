@@ -509,19 +509,57 @@ def _commit_batch(entry, out_socket, cp, source, mode):
     return out_node
 
 
+# PyActionNode.node_types lists entries create_node() cannot take:
+# "Surface" is an abstract label that RAISES RuntimeError, while the
+# concrete "Extended Bicubic" creates a node whose .type reads
+# "Surface" (live-probed 2026-08-05, 2026.2.1; the surface also
+# auto-spawns its parent axis, which is Flame's normal behavior).
+ACTION_CREATE_ALIASES = {"Surface": "Extended Bicubic"}
+
+
 def _commit_action(entry, cp, source, action_name):
     """Create + link one pick inside the Action; returns the new node."""
     a = flame.batch.get_node(action_name)
-    new = a.create_node(entry["payload"])
+    payload = ACTION_CREATE_ALIASES.get(entry["payload"], entry["payload"])
+    new = a.create_node(payload)
     try:
         new.pos_x = int(cp[0])
         new.pos_y = int(cp[1])
     except Exception:
         pass
+    # Some creates auto-spawn a parent (a surface arrives with its own
+    # axis). Flame's hand-made convention is source -> auto-axis ->
+    # surface in a vertical stack, so route the source link into the
+    # auto-parent and place it between source and new node. NB
+    # PyCoNode.parents is a METHOD (parents()), and a fresh node's
+    # parents are exactly its auto-spawned ones.
+    link_target = new
+    try:
+        autos = list(new.parents())
+        if len(autos) == 1:
+            link_target = autos[0]
+    except Exception:
+        pass
+    placed = False
     if source and source.get("name"):
         src = a.get_node(source["name"])
         if src is not None:
-            a.connect_nodes(src, new)
+            a.connect_nodes(src, link_target)
+            if link_target is not new:
+                try:
+                    sx = float(_attr(src.pos_x))
+                    sy = float(_attr(src.pos_y))
+                    link_target.pos_x = int((sx + cp[0]) / 2)
+                    link_target.pos_y = int((sy + cp[1]) / 2)
+                    placed = True
+                except Exception:
+                    pass
+    if link_target is not new and not placed:
+        try:
+            link_target.pos_x = int(cp[0])
+            link_target.pos_y = int(cp[1]) + CHAIN_DY_ACTION // 2
+        except Exception:
+            pass
     return new
 
 
