@@ -113,6 +113,26 @@ Live cursor position in **schematic space**, same coordinate system as
   What Action lacks is a `selected_nodes` collection on the
   PyActionNode itself.
 
+## Expanded-clip grab geometry, corrected (2026-08-05)
+
+- **The tabs are a RECTANGLE, not a column line.** Live grabs on an
+  expanded 39-socket clip landed at dx +109 *and* +214 from the
+  anchor; the original vertical-segment model (distance = dx) silently
+  dropped any grab past GRAB_RADIUS and the whole fan-out died with
+  source=None. The grab surface is now anchor→+EXPANDED_XMAX (320)
+  horizontally over the full tab-column height.
+- **Do NOT model per-tab rows from the SOCK_EXR calibration** for
+  media placement — the on-screen tab layout doesn't map to it
+  (tried; worse). Fan-out medias go in a clean column at
+  anchor + EXPANDED_XMAX + MEDIA_DX, and the picked Action's root is
+  pushed out of that lane when the drop lands in it.
+- **`clip.collapsed` can read stale** — during one repro cycle it
+  read True at rest while the clip was visibly expanded (likely
+  latched by undo of a prior fan-out), then tracked correctly again
+  after a manual collapse/expand. It read CORRECTLY mid-drag in the
+  same session. Treat it as advisory, not gospel; the rectangle grab
+  surface makes the matcher tolerant of it.
+
 ## Indexing sources (probed 2026-07-29)
 
 - **`~/Library/Preferences/Autodesk/flame/search/search_settings.json`**

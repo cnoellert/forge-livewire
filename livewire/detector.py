@@ -53,6 +53,11 @@ CRYPTO_PAT = "crypto"  # channel names containing this (case-insens)
                        # fan-out, exclusively used by CryptoMatte
 EXPANDED_STEP = 40     # schematic units per socket row for the expanded
                        # -clip grab segment (calibrated 37.5; padded)
+EXPANDED_XMAX = 320    # expanded-clip tabs are wide BOXES right of the
+                       # anchor, not a line: live grabs observed at dx
+                       # +109 and +214 (2026-08-05, the second one fell
+                       # outside GRAB_RADIUS and killed the fan-out);
+                       # treat dx in [0, this] as on-surface
 
 # Socket-inference geometry, calibrated 2026-08-04 against a 30-tab
 # expanded EXR and a Comp (see FINDINGS). Sockets stack down the right
@@ -170,7 +175,14 @@ def _find_source(samples, node_map, with_sockets, meta=None):
                     dy = 0.0
                 else:
                     dy = min(abs(sy - (y - seg)), abs(sy - (y + seg)))
-                d = ((sx - x) ** 2 + dy ** 2) ** 0.5
+                # tabs are wide boxes to the RIGHT of the anchor — the
+                # grab surface is a rectangle, not a vertical line
+                dx = sx - x
+                if 0.0 <= dx <= EXPANDED_XMAX:
+                    dxd = 0.0
+                else:
+                    dxd = min(abs(dx), abs(dx - EXPANDED_XMAX))
+                d = (dxd ** 2 + dy ** 2) ** 0.5
             else:
                 d = ((sx - x) ** 2 + (sy - y) ** 2) ** 0.5
             if best is None or d < best[0]:
@@ -343,13 +355,28 @@ def _wire_channels_to_action(new, src, outs):
     _connect(src, back, new, "Back")
     sx = float(_attr(src.pos_x))
     sy = float(_attr(src.pos_y))
+    # keep the Action's root OUT of the media column's lane: if the
+    # drop landed in line with the column, push it one media-step
+    # right — the graph then reads clip -> medias -> action
+    fan_x = int(sx + EXPANDED_XMAX + MEDIA_DX)
+    try:
+        if abs(float(_attr(new.pos_x)) - fan_x) < MEDIA_DX:
+            new.pos_x = fan_x + MEDIA_DX
+    except Exception:
+        pass
     i = 0
     for c in non_crypto:
         if c == back:
             continue
         media = new.add_media()
         try:
-            media.pos_x = int(sx + MEDIA_DX)
+            # clear of the expanded clip's tab RECTANGLE (tabs reach
+            # EXPANDED_XMAX right of the anchor) — +170 alone put the
+            # whole media column on top of the tabs (2026-08-05).
+            # NB: do NOT try to align medias to per-tab rows via the
+            # SOCK_EXR geometry — tried 2026-08-05, the on-screen tab
+            # layout doesn't map to it and the result was worse.
+            media.pos_x = fan_x
             media.pos_y = int(sy - i * MEDIA_DY)
         except Exception:
             pass
