@@ -24,22 +24,21 @@ the same-day follow-on fixes.
   (see FINDINGS refinement note).
 - **Livewire is ENABLED on portofino** (hook symlink at
   `/opt/Autodesk/shared/python/livewire_hook.py`).
-- **flame-01: repo synced, still disabled** — hook parked at
-  `/tmp/livewire_hook.py.disabled`, `LINUX_ENABLED` False. Blocker
-  is NOT the Shift bug (fixed); it's the two unexplained hard
-  crashes noted in `livewire/hid.py`. Needs a soak test on a
-  disposable session before enabling.
+- **flame-01: ENABLED (2026-08-05)** — `LINUX_ENABLED = True` in the
+  repo, hook symlink restored. Graduated after a full-day soak
+  (Shift regression pass, complete verb suite, Action surface work,
+  real use) ran clean. The two 2026-08-04 crashes never recurred and
+  predate the v1.3.x restructuring; if a crash pattern reappears,
+  park the hook (command below) and re-open FINDINGS.
 
 ## Loose ends
 
-1. **flame-01 soak test**, then re-enable (restore hook symlink +
-   `LINUX_ENABLED = True`).
-2. FINDINGS' old Linux conclusion "any X observation breaks Flame"
+1. FINDINGS' old Linux conclusion "any X observation breaks Flame"
    is marked suspect (all trials carried the press-snapshot
    confound). Only relevant if evdev ever becomes insufficient.
-3. `forge-flame-kb` entry 15 was corrected with the ladder result
-   (repo committed + pushed, index rebuilt). If the repaint
-   region-locality seems KB-worthy later, it lives in FINDINGS.
+2. Action surface flavors (Image/Bilinear/Perspective) are GUI-only —
+   invisible to the Python API in both directions (FINDINGS + KB).
+   Candidate Autodesk feature request.
 
 ## Standing rules (unchanged, still earned the hard way)
 

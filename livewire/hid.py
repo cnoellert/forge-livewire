@@ -28,18 +28,16 @@ DARWIN = sys.platform == "darwin"
 # help, the synchronous per-tick round trips were the cause. The xi2
 # reader makes ZERO X calls from Flame's threads: a dedicated thread
 # owns its own connection and drains raw events via select().
-# Linux status (end of 2026-08-04): the evdev backend is functionally
-# COMPLETE — gesture engine validated in-Flame over PCoIP, device
-# rescan handles PCoIP reconnects, and the Shift saga was resolved as
-# PCoIP modifier stranding + Flame-internal latch desync (livewire
-# exonerated; see FINDINGS). BUT the test box hard-crashed twice with
-# no coredump during the campaign, once with a log ending at
-# livewire's _start idle event — ambiguous, unproven, and unacceptable
-# to keep risking on a production machine. Default OFF until a soak
-# test on a disposable host clears it. Enable per-session via
-# `hid.LINUX_ENABLED = True` before install(), or flip this constant
-# on a box you can afford to disturb.
-LINUX_ENABLED = False
+# Linux status (2026-08-05): ENABLED. The evdev backend is complete —
+# gesture engine validated in-Flame over PCoIP, device rescan handles
+# PCoIP reconnects. The Shift saga's true root cause (Flame node-API
+# access during click processing — see FINDINGS' isolation ladder) is
+# fixed as of v1.3.x, and a full-day soak on flame-01 (2026-08-05,
+# heavy regression + surface probing + real use) ran clean. The two
+# 2026-08-04 hard crashes never recurred and predate the v1.3.x
+# restructuring; if a crash pattern reappears, park the hook and
+# re-open FINDINGS.
+LINUX_ENABLED = True
 
 if DARWIN:
     import Quartz
