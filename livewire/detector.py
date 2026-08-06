@@ -42,8 +42,9 @@ KEY_CHAINSEL = "r"   # replicate picks across the selection
 KEY_INGEST = "i"     # grab an Action, tap I: map-ingest table
 
 CHAIN_DX_BATCH = 200   # batch chains march right
-CHAIN_DY_ACTION = 200  # action chains build DOWN (children sit below
-                       # parents; smaller y is lower in action space)
+CHAIN_DY_ACTION = 120  # action chains build DOWN (children sit below
+                       # parents; smaller y is lower in action space);
+                       # tightened from 200 (2026-08-05, operator call)
 MEDIA_DX = 170         # media knots sit in line with their feeder,
                        # this far to its right
 MEDIA_DY = 150         # channel fan-out stacks medias this far apart
@@ -524,14 +525,29 @@ def _commit_action(entry, cp, source, action_name):
     return new
 
 
-def _nudge_burst(base):
-    """Burst of repaint nudges: Flame dirties some layout (e.g. Action
-    media attachment) in deferred passes AFTER the first repaint, so
-    nudge repeatedly; jitter each synthetic move a pixel so
-    same-position moves aren't coalesced away."""
+def _nudge_burst(base, step=(1, 0)):
+    """Burst of repaint nudges SWEEPING outward from the drop point in
+    the chain-growth direction (screen px, AppKit bottom-left origin;
+    Batch builds right (1,0), Action builds down (0,-1)).
+
+    Flame's redraw-after-input repaint is region-local around the
+    synthetic move (2026-08-05: a fixed-point burst repainted only the
+    first couple of chained nodes; 3rd+ stayed invisible until a real
+    click — sweeping fixed it, operator-verified per-Enter on 6-node
+    chains). The alternating ±1 px keeps same-position moves from
+    being coalesced away, and the long tail covers layout Flame
+    dirties in deferred passes AFTER the first repaint (e.g. Action
+    media attachment)."""
     _nudge_flame(base)
-    for delay, (jx, jy) in ((100, (1, 0)), (250, (0, 1)), (600, (1, 1))):
-        loc = (base[0] + jx, base[1] + jy) if base else None
+    if base is None:
+        for delay in (100, 250, 600):
+            QtCore.QTimer.singleShot(delay, lambda: _nudge_flame(None))
+        return
+    sx, sy = step
+    for i, delay in enumerate((80, 180, 300, 450, 650, 900), start=1):
+        off = i * 55
+        loc = (base[0] + sx * off + (i % 2),
+               base[1] + sy * off + ((i + 1) % 2))
         QtCore.QTimer.singleShot(delay, lambda loc=loc: _nudge_flame(loc))
 
 
@@ -641,7 +657,8 @@ def _fire(release_guess, source, mode, surface, act_obj, gang,
                     store.record(entry["display"])
                 except Exception:
                     pass
-            _nudge_burst(state.get("nsloc"))
+            _nudge_burst(state.get("nsloc"),
+                         (0, -1) if is_action else (1, 0))
 
         browser.show_browser(
             entries=entries,
@@ -689,7 +706,7 @@ def _infer_socket(outs, anchor, samples, meta):
 
 
 def _decide_surface():
-    """Called once, at arm time. Returns (surface, source).
+    """Called once, at fire time (release). Returns (surface, source).
 
     The Action surface is chosen when its cursor feed diverged from the
     Batch feed AND is live — either it moved during the drag, or the grab
@@ -831,10 +848,7 @@ def _tick():
                 if f_down or m_down or g_down or c_down or a_down:
                     if not _armed:
                         _armed = True
-                        _surface, _source = _decide_surface()
-                        _log("armed [%s], source=%s"
-                             % (_surface["kind"],
-                                _source["name"] if _source else None))
+                        _log("armed")
                     _to_front = _to_front or bool(f_down)
                     _to_matte = _to_matte or bool(m_down)
                     _gang = _gang or bool(g_down)
@@ -842,6 +856,19 @@ def _tick():
                     _ingest = _ingest or bool(a_down)
         elif _btn and not btn:
             if _armed:
+                # Decide the surface at FIRE time, not arm time. With
+                # the v1.3.0 deferred snapshot, Action cursor samples
+                # only begin flowing on the tick AFTER drag-live; a
+                # verb key already held when the drag starts arms on
+                # the drag-live tick itself, where zero Action samples
+                # exist and the decision would fall through to Batch
+                # (2026-08-05: G-in-Action showed Batch nodes,
+                # F-in-Action failed unless the key came late). By
+                # release every sample exists.
+                _surface, _source = _decide_surface()
+                _log("fire [%s], source=%s"
+                     % (_surface["kind"],
+                        _source["name"] if _source else None))
                 if (_ingest and _source is not None
                         and (_surface or {}).get("kind") != "action"
                         and _bat_types.get(_source["name"]) == "Action"):

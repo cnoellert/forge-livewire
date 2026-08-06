@@ -159,6 +159,20 @@ the user clicks Flame. Escalation ladder, each step falsified live:
 Corollary: panel repaint is hover-local — the move must land on the
 panel you want redrawn.
 
+**Refinement (2026-08-05): repaint is REGION-local, not just
+panel-local.** A fixed-point burst at the drop point repainted only
+the first couple of chained nodes; the 3rd+ (placed progressively
+farther away) stayed invisible until a real click. Fix: the burst
+SWEEPS outward from the drop point in the chain-growth direction
+(~55 px steps over ~1 s, Batch right / Action down), operator-verified
+per-Enter on 6-node chains. Two traps discovered with it: (a) nudges
+that pass over the browser popup still reach Flame (they're addressed
+to Flame's window) but ALSO drive Qt hover styling — a `::item:hover`
+rule turned the sweep into a phantom selection marching down the list,
+so the list has no hover rule; (b) synthetic moves posted from the
+bridge's HTTP thread never fire — Qt timers and event posting must
+happen on the main thread via `schedule_idle_event`.
+
 - Action schematic layout is vertical: children sit *below* parents
   (smaller y). Chains/gangs in Action should build downward; Batch
   builds rightward.
@@ -313,6 +327,20 @@ off-schematic both freeze — see the context-detection finding above).
 Media-panel clicks never trigger any node-API call at all. Verified
 live 2026-08-05: shift-select clean with the full detector running,
 noodle-drop verbs working.
+
+**Follow-on (v1.3.1): the surface decision moved from arm time to
+fire time.** With the deferred snapshot, Action cursor samples only
+begin flowing on the tick AFTER drag-live — so a verb key already
+held when the drag starts (the natural gesture) armed on the
+drag-live tick itself with zero Action samples, and `_decide_surface`
+fell through to Batch (symptoms: G-in-Action offered Batch nodes,
+F-in-Action only worked when the key came late in the drag; R+M/G+M
+also misbehaved because the arm-time call predated the multi-select
+context). Deciding at release, when the full sample history exists,
+fixed all of it. Nothing between arm and release ever consumed the
+decision, and release-time node-API reads are outside the
+click-processing poison window (only armed — i.e. genuinely
+dragging — gestures reach that branch).
 
 **Fallout for earlier conclusions:**
 

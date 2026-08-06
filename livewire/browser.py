@@ -91,8 +91,14 @@ QListWidget {
 }
 QListWidget::item { padding: 3px 7px; border-radius: %(radius)s; }
 QListWidget::item:selected { background: %(sel_bg)s; color: %(sel_fg)s; }
-QListWidget::item:hover { background: %(hover)s; }
 """ % THEMES[THEME]
+# No ::item:hover rule, deliberately: the post-commit repaint nudge
+# sweeps synthetic mouse moves from the drop point (where this popup
+# sits) toward the freshly placed nodes, and a hover highlight turns
+# that sweep into a phantom "selection" marching down the list
+# (2026-08-05, Action gangs — the sweep direction there is straight
+# down the rows). The list is keyboard-driven; hover feedback isn't
+# worth the artifact.
 
 
 def _match(query, text):
@@ -315,6 +321,16 @@ class NodeBrowser(QtWidgets.QWidget):
             self._trail.append(entry["label"])
             self._update_header()
             self._edit.clear()
+            # Keep the just-committed entry selected by IDENTITY, not
+            # row index: clearing the filter rebuilds the list, and
+            # index-based selection made the highlight creep down the
+            # list on every chained commit (2026-08-05, Action gangs).
+            # Repeated Enters now re-commit the same pick.
+            for i in range(self._list.count()):
+                if self._list.item(i).data(QtCore.Qt.UserRole) is entry:
+                    self._list.setCurrentRow(i)
+                    self._list.scrollToItem(self._list.item(i))
+                    break
             self._edit.setFocus(QtCore.Qt.OtherFocusReason)
             self.adjustSize()
             return

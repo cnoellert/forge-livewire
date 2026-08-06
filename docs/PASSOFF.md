@@ -1,54 +1,45 @@
-# Passoff — 2026-08-05 (the Shift bug is FIXED)
+# Passoff — 2026-08-05 (Shift bug fixed; full regression pass clean)
 
-Read this first, then [FINDINGS.md](FINDINGS.md) — especially its
-"isolation ladder (2026-08-05)" section, which is the authoritative
-account of the bug that dominated the last week.
+Read this first, then [FINDINGS.md](FINDINGS.md) — its "isolation
+ladder (2026-08-05)" section is the authoritative account of the
+Shift bug; the repaint-refinement and fire-time-decision notes cover
+the same-day follow-on fixes.
 
 ## State right now
 
-- **The Media-panel shift-select bug is root-caused and fixed**
-  (v1.3.0). Root cause: any Flame node-API access (`current_node`,
-  `nodes` iteration, attr reads — each independently sufficient)
-  performed synchronously while Flame processes a click breaks that
-  click's shift-anchor handling in the Media panel. NOT the Quartz
-  key/button polling, NOT the timer, NOT `cursor_position` reads,
-  NOT popup focus churn. Proven by a 6-rung isolation ladder with
-  repeat trials; see FINDINGS.
-- **The fix:** `detector._tick` touches zero Flame node API at button
-  press. The surface snapshot is deferred to the drag-live
-  transition (two distinct `cursor_position` samples with the button
-  down), which only genuine schematic drags produce. Media-panel
-  clicks never touch the node API at all.
-- **Verified live on portofino** (macOS, Flame 2026.2.2, real finish
-  project): shift-select clean with the full detector running;
-  noodle-drop verbs confirmed working. Action-schematic drag not yet
-  explicitly re-tested post-fix (design says it works: both cursor
-  feeds stream during Action drags; verify when convenient).
-- **Livewire is RE-ENABLED on portofino** (hook symlink restored to
-  `/opt/Autodesk/shared/python/livewire_hook.py`, detector running in
-  the live session).
-- **flame-01 (Linux) stays disabled** — not because of this bug
-  (fixed), but because of the two unexplained hard crashes noted in
-  `livewire/hid.py`. It needs a soak test on a disposable host before
-  `LINUX_ENABLED` flips. Note: FINDINGS' "any X observation breaks
-  Flame" conclusion is now suspect (all those trials carried the
-  press-snapshot confound); the X backends could be retested with
-  v1.3.0 if evdev ever becomes insufficient.
+- **v1.3.1 is live and verified on portofino** (macOS, Flame
+  2026.2.2, real finish project). Full operator regression pass
+  clean: Media-panel shift-select, F / G / G+M / R / R+M in Batch,
+  F and G chains in Action schematics, browser selection stable,
+  Action chain spacing tightened (CHAIN_DY_ACTION 200 → 120).
+- **The Shift bug** (a week of pain): any Flame node-API access
+  during click processing breaks that click's shift-anchor in the
+  Media panel. Fixed by deferring the surface snapshot to drag-live
+  (v1.3.0) and the surface *decision* to fire time (v1.3.1). The
+  Quartz polling was never guilty. See FINDINGS.
+- **Repaint** is region-local, not just panel-local: the post-commit
+  nudge burst now SWEEPS from the drop point toward the chain growth
+  direction. The browser list deliberately has no hover style — the
+  sweep's synthetic moves drove a phantom hover-selection march
+  (see FINDINGS refinement note).
+- **Livewire is ENABLED on portofino** (hook symlink at
+  `/opt/Autodesk/shared/python/livewire_hook.py`).
+- **flame-01: repo synced, still disabled** — hook parked at
+  `/tmp/livewire_hook.py.disabled`, `LINUX_ENABLED` False. Blocker
+  is NOT the Shift bug (fixed); it's the two unexplained hard
+  crashes noted in `livewire/hid.py`. Needs a soak test on a
+  disposable session before enabling.
 
-## Loose ends, in priority order
+## Loose ends
 
-1. **Action-schematic regression pass** — one R/G gang and one
-   converge inside an Action, confirming the deferred snapshot arms
-   correctly there.
-2. **flame-01 soak test** on a scratch box/session before re-enabling
-   Linux (crashes, not the Shift bug, are the blocker).
-3. **forge-flame-kb correction** — its entry on X polling breaking
-   Flame keyboard handling inherits the confound; update it with the
-   ladder result (edit docs/*.md, then rebuild chunks + index per
-   that repo's README).
-4. The `_bat_meta` staleness caveat is unchanged: `cursor_position`
-   can be stale at the press instant (~100–150 ms catch-up), which is
-   why drag-live requires two samples — do not "optimize" that away.
+1. **flame-01 soak test**, then re-enable (restore hook symlink +
+   `LINUX_ENABLED = True`).
+2. FINDINGS' old Linux conclusion "any X observation breaks Flame"
+   is marked suspect (all trials carried the press-snapshot
+   confound). Only relevant if evdev ever becomes insufficient.
+3. `forge-flame-kb` entry 15 was corrected with the ladder result
+   (repo committed + pushed, index rebuilt). If the repaint
+   region-locality seems KB-worthy later, it lives in FINDINGS.
 
 ## Standing rules (unchanged, still earned the hard way)
 
@@ -56,12 +47,12 @@ account of the bug that dominated the last week.
 - **Never test on a working artist's box** without explicit consent
   for that session.
 - **One variable per test; repeat before believing.** The ladder
-  worked precisely because of this; v1.2.0 shipped off a confounded
-  single trial and blamed the wrong call for a week.
+  worked because of this; v1.2.0 shipped off a confounded single
+  trial and blamed the wrong call for a week.
 - The bridge's `/exec` runs code on its HTTP thread by default — Qt
-  objects (timers!) created there never fire. Pass
-  `main_thread: true` or wrap in `flame.schedule_idle_event`, and
-  remember idle events drain only on Flame UI activity (nudge the UI).
+  timers/events created there never fire. Use `main_thread: true` or
+  `flame.schedule_idle_event`, and remember idle events drain only on
+  Flame UI activity (nudge the UI).
 
 ## Disable in an emergency
 
