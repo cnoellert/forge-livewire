@@ -1,5 +1,120 @@
 # Changelog
 
+## 1.3.3 — 2026-08-05
+
+**Expanded-EXR grab surface is a rectangle, not a line.** The tabs on
+an expanded multichannel clip reach ~+320px right of the anchor (live
+grabs landed at dx +109 and +214), so grabs past `GRAB_RADIUS` were
+silently killing the fan-out with `source=None`. Matching now treats
+any dx in `[0, EXPANDED_XMAX]` as on-surface, across the full
+tab-column height.
+
+**Fan-out geography.** The media column moves fully clear of the tab
+rectangle (`anchor + EXPANDED_XMAX + MEDIA_DX`), and the picked
+Action's root is pushed out of the column's lane when the drop lands
+in line with it. Per-tab row alignment via the `SOCK_EXR` calibration
+was tried and reverted — the on-screen layout doesn't map to it; a
+warning comment marks the dead end.
+
+**Linux is enabled by default again.** `LINUX_ENABLED = True`. A
+full-day soak on flame-01 — Shift regression pass, the complete verb
+suite, Action surface work, real production use — ran clean on the
+evdev backend with v1.3.x. The two 2026-08-04 crashes that forced
+1.1.2's opt-in never recurred and predate the restructuring. The
+flame-01 hook symlink is restored.
+
+Operator-verified on portofino: all verbs on expanded and collapsed
+multichannel EXRs. Also recorded in FINDINGS: `clip.collapsed` can
+read stale at rest (likely latched by undo) while reading correctly
+mid-drag — advisory only.
+
+## 1.3.2 — 2026-08-05
+
+**Action surface rigs.** A commit that arrives with its own axis — as
+surfaces do — occupies two rows, so the chain step doubles for it;
+chained surfaces had been stacking into each other. When the drop
+lands closer than two rows below the source, the rig is pushed down to
+clearance so the auto-axis never crams into the source node.
+
+**`Surface` is an alias for Extended Bicubic.** `create_node("Surface")`
+raises despite `"Surface"` appearing in `node_types` — Extended Bicubic
+is the only creatable surface, and its `.type` reads back as
+`"Surface"`. Commits now route the source link into the auto-spawned
+parent axis and place it midway, matching Flame's hand-made
+source → axis → surface convention.
+
+Probed live on 2026.2.1: surface flavor (Image / Bilinear /
+Perspective / Ext Bicubic) is pure GUI state, invisible to Python in
+both directions; `add_media()` spawns the full image rig, the only
+scriptable "Image" path; and per-node `.selected` does work inside
+Action, contrary to the earlier no-selection-signal claim.
+Operator-verified on flame-01: clean axis → surface → axis → surface
+stacks from both tight and roomy drops.
+
+## 1.3.1 — 2026-08-05
+
+**The surface decision moves from arm time to fire time.** With
+1.3.0's deferred snapshot, a verb key held early armed with zero
+Action samples and misclassified the surface as Batch — G-in-Action
+offered Batch nodes, F-in-Action needed a late key, R+M and G+M missed
+the multi-select context. Deciding at release sees the full history.
+
+**Repaint is region-local, not just panel-local.** The post-commit
+nudge burst now sweeps in ~55px steps from the drop point in the
+chain-growth direction (right in Batch, down in Action). Fixed-point
+bursts left 3rd-and-beyond chained nodes invisible until a real click.
+
+**Browser polish.** Dropped the `::item:hover` rule — the sweep's
+synthetic moves marched a phantom hover-selection down the list — and
+pinned chain-mode selection to the committed entry by identity rather
+than row index. `CHAIN_DY_ACTION` 200 → 120 (operator call).
+
+Full operator regression pass clean on portofino (2026.2.2):
+shift-select, F/G/G+M/R/R+M in Batch, F/G in Action.
+
+## 1.3.0 — 2026-08-05
+
+**The real fix: defer the node snapshot past click processing.** The
+isolation ladder proved the Media-panel shift-select breakage was
+never the Quartz polling. Any Flame node-API access — `current_node`,
+iterating `nodes`, reading an attr, each independently sufficient —
+made synchronously while Flame is processing a click breaks that
+click's shift-anchor handling. The timer, button and key polling,
+`cursor_position` reads, and `NSApp.isActive` all polled clean at
+30 ms.
+
+The press transition now touches zero Flame node API; the surface
+snapshot defers to the drag-live transition (two distinct
+`cursor_position` samples with the button down), which only genuine
+schematic drags produce. Media-panel clicks never reach the node API.
+
+Verified live: shift-select clean with the full detector running,
+noodle drops working. FINDINGS gains the ladder record, and both the
+08-04 latch-desync narrative and the Linux "any X observation breaks
+Flame" conclusion are marked superseded/suspect — each carried the
+press-snapshot confound.
+
+## 1.1.2 — 2026-08-04
+
+**Linux back to opt-in, pending a disposable-host soak.** The evdev
+backend is complete and validated, but two evidence-free hard crashes
+on the test box — one log ending at livewire's `_start` — made
+"probably fine" insufficient for a production machine. Enabling Linux
+is now explicit opt-in; the flame-01 hook was pulled.
+
+## 1.1.0 — 2026-08-04
+
+**Linux ships, on evdev.** `LINUX_ENABLED = True`, reading kernel
+input events directly instead of asking X anything. The Shift saga
+resolved: the input chain was clean end-to-end all along — server mask
+probes showed perfect Shift+Btn1 chords while Flame ignored them. The
+culprits were a PCoIP-stranded phantom Ctrl in the server, then
+Flame's own internal modifier latch desyncing on focus churn, cured by
+tapping the modifiers with Flame focused. All three transports are
+exonerated and popups strand nothing (controlled test, clean mask).
+`evdev` also rescans for new device nodes, since PCoIP recreates them
+on reconnect.
+
 ## 1.0.3 — 2026-08-04
 
 **Linux/X11 disabled.** With livewire running on Rocky, Shift stopped
