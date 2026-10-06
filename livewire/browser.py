@@ -334,9 +334,17 @@ class NodeBrowser(QtWidgets.QWidget):
             self._edit.setFocus(QtCore.Qt.OtherFocusReason)
             self.adjustSize()
             return
+        # hide, commit, THEN close: close() posts this WA_DeleteOnClose
+        # widget's DeferredDelete, and anything in the commit that
+        # flushes posted events would destroy us while we are still on
+        # our own eventFilter stack (2026-10-05: SIGSEGV/SIGILL right
+        # after createNode/connectNodes).
         self._committed = True
-        self.close()
-        self._on_commit(entry, socket)
+        self.hide()
+        try:
+            self._on_commit(entry, socket)
+        finally:
+            self.close()
 
     # Close when the user clicks away (Tool windows don't auto-dismiss
     # like Popup, but Popup can never become the macOS key window inside

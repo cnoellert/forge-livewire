@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.4 — 2026-10-05
+
+**Fix: Flame crash on commit.** Pressing Enter in the browser crashed
+Flame 2026.2.2 (SIGSEGV / SIGILL) right after `createNode` or
+`connectNodes`. `_commit` closed the `WA_DeleteOnClose` popup *before*
+running the commit, and `_nudge_flame`'s synchronous
+`sendPostedEvents()` then ran the DeferredDelete while still on the
+popup's own eventFilter stack — use-after-free on unwind. The popup now
+hides, commits, then closes; and every repaint nudge, the first
+included, goes through `QTimer.singleShot`, so the event loop is never
+pumped re-entrantly from inside a Qt handler (gang mode too).
+
+Operator-verified on portofino.
+
 ## 1.3.3 — 2026-08-05
 
 **Expanded-EXR grab surface is a rectangle, not a line.** The tabs on

@@ -615,8 +615,13 @@ def _nudge_burst(base, step=(1, 0)):
     chains). The alternating ±1 px keeps same-position moves from
     being coalesced away, and the long tail covers layout Flame
     dirties in deferred passes AFTER the first repaint (e.g. Action
-    media attachment)."""
-    _nudge_flame(base)
+    media attachment).
+
+    Every nudge, the first included, goes through singleShot: the
+    commit runs inside the popup's eventFilter, and _nudge_flame pumps
+    Qt's event loop — never do that re-entrantly from inside a Qt
+    handler (2026-10-05 crashes)."""
+    QtCore.QTimer.singleShot(0, lambda: _nudge_flame(base))
     if base is None:
         for delay in (100, 250, 600):
             QtCore.QTimer.singleShot(delay, lambda: _nudge_flame(None))
