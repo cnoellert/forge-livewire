@@ -178,10 +178,13 @@ Everything lives in two files, plain constants at the top:
   grab must be to a node's position to identify it; default 150),
   `TICK_MS` (poll rate, default 30 ms), `VERBOSE` (arm/commit messages
   in the shell; off by default, errors always print).
-- [`livewire/browser.py`](livewire/browser.py) — `THEME`: `"flame"`
-  (neutral greys matching the native node search, alternating rows in a
-  cool Autodesk grey) or `"forge"` (forge-orange selection/focus
-  accent). Fonts, colors, and sizes are all in the `THEMES` table.
+- [`livewire/browser.py`](livewire/browser.py) — two skins, switched
+  live with the pill switch at the top right of the popup (remembered in
+  `~/.config/livewire.json`): `"forge"` (default — the forge-hud family
+  look: system UI font, slate rounded panel, menu-blue selection, ember
+  focus) or `"flame"` (Discreet and neutral greys matching the native
+  node search). `THEME` is the first-run default; fonts, colors, and
+  sizes are in the `THEMES` table.
 
 ## How it works
 

@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.4.0 — 2026-10-05
+
+**FORGE theme, now the default.** The popup takes the forge-hud /
+forge-takes family look: translucent slate panel with rounded corners
+and a `#3a3f4f` border, the host's system UI font (the family never
+names one), menu-blue `#2d4f7a` selection, ember focus, a thin
+scrollbar, and the socket dropdown styled like the HUD's menus. The
+header reads like a HUD row title — small bold uppercase verb
+(FROM / GANG / PARENT / BACK), bright node name. The Action map-ingest
+dialog follows the same theme. The Flame skin (Discreet, neutral
+greys) is unchanged.
+
+**Live theme switch.** A small painted pill switch at the popup's top
+right flips between FORGE (ember) and Flame (grey); the choice persists
+in `~/.config/livewire.json` (`"theme"`). It is NoFocus and its handler
+only restyles — livewire's first in-popup control since the 2026-08-04
+pin/tag crashes, which the notes now attribute to the 1.3.4
+use-after-free rather than controls as such (forge-takes' controls run
+clean in the same host).
+
+**Fixes.** The list sizes from its real row height — a fixed 24px
+against 22px rows left a half row peeking at the bottom once the list
+scrolled. Header separators are plain spaces under `white-space: pre`,
+never `&nbsp;`: Discreet carries a stray visible glyph at U+00A0
+("fromÊÊSET_prerender").
+
+Operator-verified on portofino.
+
 ## 1.3.4 — 2026-10-05
 
 **Fix: Flame crash on commit.** Pressing Enter in the browser crashed

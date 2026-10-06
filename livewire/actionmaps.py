@@ -135,8 +135,10 @@ class MapperDialog(QtWidgets.QWidget):
                          | QtCore.Qt.FramelessWindowHint
                          | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setObjectName("livewirePanel")
-        self.setStyleSheet(browser._QSS)
+        self._theme = browser._theme_name()
+        self.setStyleSheet(browser._qss(self._theme))
         self._action = action_name
         self._rows = rows
         self._on_done = on_done
@@ -183,6 +185,9 @@ class MapperDialog(QtWidgets.QWidget):
         ok.clicked.connect(self._commit)
         btns.addWidget(ok)
         lay.addLayout(btns)
+
+    def paintEvent(self, _ev):
+        browser.paint_panel(self, self._theme)
 
     def keyPressEvent(self, ev):
         if ev.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):

@@ -13,53 +13,63 @@ ROW_H = 24
 
 _open = []
 
-# Two skins over identical geometry (Discreet font, dense flat rows):
-#   "flame" — faithful to Flame 2026's own node-search popup: neutral
-#             charcoal, square corners, light-gray selection bar.
-#   "forge" — same body, forge-orange E87E24 signature on selection/focus.
-THEME = "flame"
+# Two skins over identical geometry (dense flat rows), switchable live
+# from the pill switch in the popup's header; the choice persists in
+# ~/.config/livewire.json ("theme"). THEME is only the first-run default.
+#   "forge" — the FORGE family look (forge-hud / forge-takes): translucent
+#             slate panel, rounded, #3a3f4f border, the host's system UI
+#             font (the family never names one), small bold uppercase
+#             #8a93a4 labels, menu-blue #2d4f7a selection, ember focus.
+#   "flame" — faithful to Flame 2026's own node-search popup: Discreet,
+#             neutral charcoal, square corners, light-gray selection bar.
+THEME = "forge"
+EMBER = "#E87E24"
 
 THEMES = {
     "flame": {
-        "panel_bg": "#262626", "panel_border": "#4e4e4e", "radius": "0px",
+        "panel_rgba": (38, 38, 38, 255), "panel_border": "#4e4e4e",
+        "panel_radius": 0, "radius": "0px",
+        "font": 'font-family: "Discreet";',
         "field_bg": "#131313", "field_border": "#5a5a5a",
         "field_focus": "#8a8a8a", "field_fg": "#d6d6d6",
-        "row_fg": "#c0c0c0", "hover": "#3a3d42",
-        "alt_bg": "#2e3033",
+        "row_fg": "#c0c0c0", "alt_bg": "#2e3033",
         "sel_bg": "#57595b", "sel_fg": "#f2f2f2",
-        "header_fg": "#909090",
+        "view_bg": "#262626", "view_border": "#4e4e4e",
+        "scroll": "#5a5a5a", "scroll_radius": "0px",
+        # header: verb words / names / dim suffixes
+        "hdr_verb": "#909090", "hdr_name": "#909090", "hdr_dim": "#909090",
+        "hdr_upper": False,
+        "hdr_verb_css": "",
     },
     "forge": {
-        "panel_bg": "#2b2b2b", "panel_border": "#464646", "radius": "2px",
-        "field_bg": "#1c1c1c", "field_border": "#3d3d3d",
-        "field_focus": "#E87E24", "field_fg": "#d9d9d9",
-        "row_fg": "#b8b8b8", "hover": "#383838",
-        "alt_bg": "#313131",
-        "sel_bg": "#E87E24", "sel_fg": "#141414",
-        "header_fg": "#E87E24",
+        "panel_rgba": (20, 22, 28, 235), "panel_border": "#3a3f4f",
+        "panel_radius": 9, "radius": "3px",
+        "font": "",
+        "field_bg": "#0f1116", "field_border": "#3a3f4f",
+        "field_focus": EMBER, "field_fg": "#dddddd",
+        "row_fg": "#cccccc", "alt_bg": "#1a1d24",
+        "sel_bg": "#2d4f7a", "sel_fg": "#ffffff",
+        "view_bg": "#23262f", "view_border": "#3a3f4f",
+        "scroll": "#3a3f4f", "scroll_radius": "3px",
+        "hdr_verb": "#8a93a4", "hdr_name": "#dddddd", "hdr_dim": "#666666",
+        "hdr_upper": True,
+        "hdr_verb_css": "font-size: 10px; font-weight: bold; ",
     },
 }
 
+# The panel body itself is painted (paint_panel: rounded + translucent
+# needs WA_TranslucentBackground, which can't be flipped after show), so
+# the sheet only styles the children.
 _QSS = """
-#livewirePanel {
-    background: %(panel_bg)s;
-    border: 1px solid %(panel_border)s;
-    border-radius: %(radius)s;
-    font-family: "Discreet";
-}
-QLabel#header {
-    color: %(header_fg)s;
-    font-family: "Discreet";
-    font-size: 12px;
-    padding: 1px 2px 0 2px;
-}
+#livewirePanel { %(font)s }
+QLabel#header { %(font)s font-size: 11px; padding: 1px 2px 0 2px; }
 QLineEdit {
     background: %(field_bg)s;
     color: %(field_fg)s;
     border: 1px solid %(field_border)s;
     border-radius: %(radius)s;
     padding: 5px 7px;
-    font-family: "Discreet";
+    %(font)s
     font-size: 13px;
     selection-background-color: %(sel_bg)s;
     selection-color: %(sel_fg)s;
@@ -71,12 +81,15 @@ QComboBox {
     border: 1px solid %(field_border)s;
     border-radius: %(radius)s;
     padding: 3px 7px;
-    font-family: "Discreet";
+    %(font)s
     font-size: 12px;
 }
 QComboBox QAbstractItemView {
-    background: %(panel_bg)s;
+    background: %(view_bg)s;
     color: %(row_fg)s;
+    border: 1px solid %(view_border)s;
+    outline: none;
+    padding: 2px;
     selection-background-color: %(sel_bg)s;
     selection-color: %(sel_fg)s;
 }
@@ -85,13 +98,98 @@ QListWidget {
     alternate-background-color: %(alt_bg)s;
     color: %(row_fg)s;
     border: none;
-    font-family: "Discreet";
+    %(font)s
     font-size: 13px;
     outline: none;
 }
 QListWidget::item { padding: 3px 7px; border-radius: %(radius)s; }
 QListWidget::item:selected { background: %(sel_bg)s; color: %(sel_fg)s; }
-""" % THEMES[THEME]
+QScrollBar:vertical {
+    background: transparent; width: 6px; margin: 2px 0 2px 0;
+}
+QScrollBar::handle:vertical {
+    background: %(scroll)s; border-radius: %(scroll_radius)s;
+    min-height: 24px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0; border: none; background: none;
+}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+"""
+
+
+class ThemeSwitch(QtWidgets.QAbstractButton):
+    """Tiny painted pill switch: ember = FORGE, grey = Flame. Painted,
+    not a glyph (same reasoning as forge-hud's grip), and NoFocus so
+    the search field keeps every key. Its handler must only restyle —
+    see the controls NOTE on NodeBrowser."""
+
+    W, H = 22, 12
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.setFixedSize(self.W, self.H)
+        self.setToolTip("FORGE theme")
+
+    def paintEvent(self, _ev):
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        on = self.isChecked()
+        r = self.H / 2.0
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(QtGui.QColor(EMBER if on else "#3a3f4f"))
+        p.drawRoundedRect(QtCore.QRectF(0, 0, self.W, self.H), r, r)
+        d = self.H - 4
+        x = self.W - d - 2 if on else 2
+        p.setBrush(QtGui.QColor("#f2f2f2" if on else "#8a93a4"))
+        p.drawEllipse(QtCore.QRectF(x, 2, d, d))
+
+
+def _theme_name():
+    from . import store
+    name = store.theme(THEME)
+    return name if name in THEMES else THEME
+
+
+def _qss(name):
+    return _QSS % THEMES[name]
+
+
+def _header_html(segs, name):
+    """Header segments as rich text in theme *name*: forge-hud's row
+    titles (small bold uppercase grey) for verbs, bright names."""
+    import html
+    t = THEMES[name]
+    out = []
+    for kind, text in segs:
+        text = html.escape(text)
+        if kind == "verb":
+            if t["hdr_upper"]:
+                text = text.upper()
+            out.append(u'<span style="%scolor: %s;">%s</span>'
+                       % (t["hdr_verb_css"], t["hdr_verb"], text))
+        else:
+            out.append(u'<span style="color: %s;">%s</span>'
+                       % (t["hdr_%s" % kind], text))
+    # plain spaces kept by white-space: pre, NOT &nbsp; — Discreet maps
+    # U+00A0 to a stray glyph ("fromÊÊSET_prerender", 2026-10-05)
+    return u'<span style="white-space: pre;">%s</span>' % u"  ".join(out)
+
+
+def paint_panel(w, name):
+    """Paint the panel body for theme *name* on a translucent widget."""
+    t = THEMES[name]
+    p = QtGui.QPainter(w)
+    p.setRenderHint(QtGui.QPainter.Antialiasing)
+    p.setBrush(QtGui.QColor(*t["panel_rgba"]))
+    p.setPen(QtGui.QPen(QtGui.QColor(t["panel_border"]), 1))
+    r = t["panel_radius"]
+    p.drawRoundedRect(QtCore.QRectF(w.rect()).adjusted(0.5, 0.5, -0.5, -0.5),
+                      r, r)
 # No ::item:hover rule, deliberately: the post-commit repaint nudge
 # sweeps synthetic mouse moves from the drop point (where this popup
 # sits) toward the freshly placed nodes, and a hover highlight turns
@@ -139,16 +237,13 @@ def _rank(query, entry):
     return (m, 0 if pin else 1, -score, -u.get("t", 0), disp.lower())
 
 
-# NOTE: interactive pin/tag controls were attempted twice and BOTH
-# crashed Flame — first clickable row icons via a QStyledItemDelegate,
-# then Ctrl+P / Ctrl+T through this widget's event filter. Suspected
-# causes: Qt6 dropped QMouseEvent.pos(), exceptions inside a delegate
-# unwind through Qt's C++ dispatch, and singleShot callbacks can fire
-# into a WA_DeleteOnClose widget that is already gone. Whatever the
-# precise mechanism, novel interactive Qt inside this host is not worth
-# the risk. Pins and tags are file-edited in ~/.config/livewire.json;
-# ranking still learns passively from commits (no UI, no exposure).
-# Do not re-add interactive controls without a scratch-project soak.
+# NOTE: interactive pin/tag controls crashed Flame twice (2026-08-04:
+# QStyledItemDelegate row icons, then Ctrl+P / Ctrl+T via the event
+# filter). Best explanation since 1.3.4: the commit nudge's synchronous
+# sendPostedEvents() deleted this WA_DeleteOnClose widget mid-handler.
+# Other suspects still worth respecting: Qt6 dropped QMouseEvent.pos(),
+# and exceptions inside a delegate unwind through Qt's C++ dispatch.
+# Pins and tags remain file-edited in ~/.config/livewire.json.
 
 
 class NodeBrowser(QtWidgets.QWidget):
@@ -159,8 +254,10 @@ class NodeBrowser(QtWidgets.QWidget):
                          | QtCore.Qt.FramelessWindowHint
                          | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setObjectName("livewirePanel")
-        self.setStyleSheet(_QSS)
+        self._theme = _theme_name()
+        self.setStyleSheet(_qss(self._theme))
         self.setFixedWidth(WIDTH)
 
         self._entries = entries
@@ -179,12 +276,26 @@ class NodeBrowser(QtWidgets.QWidget):
 
         self._kind = kind
         self._mode = mode
+        # header row: context label left, FORGE theme tick right. The
+        # tick is the popup's only non-keyboard control — NoFocus so the
+        # search field keeps the keys, and its handler only restyles
+        # (no timers, no close, no Flame API). See the NOTE below.
+        hrow = QtWidgets.QHBoxLayout()
+        hrow.setContentsMargins(0, 0, 0, 0)
+        hrow.setSpacing(6)
         if chain or (source and source.get("name")):
             self._header = QtWidgets.QLabel(self)
             self._header.setObjectName("header")
-            self._header.setTextFormat(QtCore.Qt.PlainText)
+            self._header.setTextFormat(QtCore.Qt.RichText)
             self._update_header()
-            lay.addWidget(self._header)
+            hrow.addWidget(self._header, 1)
+        else:
+            hrow.addStretch(1)
+        self._tick = ThemeSwitch(self)
+        self._tick.setChecked(self._theme == "forge")
+        self._tick.toggled.connect(self._set_theme)
+        hrow.addWidget(self._tick, 0, QtCore.Qt.AlignVCenter)
+        lay.addLayout(hrow)
         if source and source.get("name"):
             sockets = source.get("sockets") or []
             if len(sockets) > 1 and kind != "action" and mode != "front_matte":
@@ -231,6 +342,24 @@ class NodeBrowser(QtWidgets.QWidget):
 
         self._refilter("")
 
+    # -- theme -------------------------------------------------------------
+
+    def _set_theme(self, forge):
+        self._theme = "forge" if forge else "flame"
+        self.setStyleSheet(_qss(self._theme))
+        self._update_header()
+        self._refilter(self._edit.text())
+        self.update()
+        try:
+            from . import store
+            store.set_theme(self._theme)
+        except Exception:
+            pass
+        self._edit.setFocus(QtCore.Qt.OtherFocusReason)
+
+    def paintEvent(self, _ev):
+        paint_panel(self, self._theme)
+
     # -- header ------------------------------------------------------------
 
     def _update_header(self):
@@ -239,19 +368,24 @@ class NodeBrowser(QtWidgets.QWidget):
         if not self._trail and not self._chain:
             self._header.setText(u"")
             return
-        extras = (self._source or {}).get("extra") or []
-        back = (u"   back  %s" % ", ".join(e["name"] for e in extras)
-                if extras else u"")
+        segs = []
         if self._chain:
-            trail = "  >  ".join(self._trail) if self._trail else "(new)"
-            self._header.setText(u"gang  %s%s" % (trail, back))
+            segs += [("verb", u"gang"),
+                     ("name", u"  >  ".join(self._trail) if self._trail
+                      else u"(new)")]
         elif self._kind == "action":
-            self._header.setText(u"parent  %s" % self._trail[0])
+            segs += [("verb", u"parent"), ("name", self._trail[0])]
         else:
-            suffix = {"matte": u"  (to matte)",
-                      "front_matte": u"  (front+matte)"}.get(self._mode, u"")
-            self._header.setText(u"from  %s%s%s"
-                                 % (self._trail[0], suffix, back))
+            segs += [("verb", u"from"), ("name", self._trail[0])]
+            suffix = {"matte": u"to matte",
+                      "front_matte": u"front+matte"}.get(self._mode)
+            if suffix:
+                segs.append(("dim", u"(%s)" % suffix))
+        extras = (self._source or {}).get("extra") or []
+        if extras:
+            segs += [("verb", u"back"),
+                     ("name", u", ".join(e["name"] for e in extras))]
+        self._header.setText(_header_html(segs, self._theme))
 
     # -- filtering ---------------------------------------------------------
 
@@ -270,7 +404,12 @@ class NodeBrowser(QtWidgets.QWidget):
         if self._list.count():
             self._list.setCurrentRow(0)
         rows = min(self._list.count(), MAX_ROWS)
-        self._list.setFixedHeight(max(rows, 1) * ROW_H + 4)
+        # the real row height (it follows the theme's font): a fixed
+        # ROW_H that disagreed left a half row peeking at the bottom
+        row_h = self._list.sizeHintForRow(0)
+        if row_h <= 0:
+            row_h = ROW_H
+        self._list.setFixedHeight(max(rows, 1) * row_h + 4)
         self.adjustSize()
 
     # -- keys --------------------------------------------------------------
@@ -292,13 +431,12 @@ class NodeBrowser(QtWidgets.QWidget):
                 return True
         return False
 
-    # NOTE: interactive pin/tag controls were tried TWICE (clickable
-    # row icons, then Ctrl+P / Ctrl+T) and BOTH crashed Flame. Custom
-    # Qt interaction inside this host is not worth the risk: pins and
-    # tags are file-edited in ~/.config/livewire.json instead, and
-    # usage-based ranking (recorded passively on commit) gives most of
-    # the benefit with none of the exposure. Do not re-add without a
-    # scratch-project soak test.
+    # NOTE: interactive pin/tag controls crashed Flame twice
+    # (2026-08-04), most likely via the since-fixed 1.3.4
+    # use-after-free (the commit nudge flushed this widget's
+    # DeferredDelete mid-handler), not controls as such — see ROADMAP.
+    # Keep any control NoFocus, and never close, commit, or pump
+    # events from its handler.
 
     # -- commit ------------------------------------------------------------
 

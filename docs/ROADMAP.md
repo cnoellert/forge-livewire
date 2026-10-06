@@ -100,9 +100,14 @@ Flame's search weight) → recency → name. The same file is item 8's
 future config home. Tag search also matches Flame's own Tags plus a
 per-entry `tags` map in the same file.
 
-**Do not add in-browser pin/tag controls.** Tried twice, crashed Flame
-both times (delegate row icons; then Ctrl+P/Ctrl+T) — see the note in
-browser.py. Any retry needs a scratch project and a soak test.
+**In-browser pin/tag controls: re-open, carefully.** Tried twice on
+2026-08-04, crashed Flame both times (delegate row icons; then
+Ctrl+P/Ctrl+T). Those attempts postdate the 2026-07-31 nudge, whose
+synchronous `sendPostedEvents()` deleted the popup mid-handler — the
+1.3.4 use-after-free — so they were likely that bug, not "controls in
+Flame". forge-takes' dialog/HUD controls run clean, and 1.4.0's FORGE
+theme tick is livewire's first control since. Rules that still hold:
+NoFocus on controls, handlers never close/commit/pump events.
 Follow-up worth having: usage decay if ancient habits crowd the list.
 
 ## 6. Insert into an existing noodle

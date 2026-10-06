@@ -65,6 +65,15 @@ def set_tags(display, tag_list):
     _save()
 
 
+def theme(default):
+    return _load().get("theme") or default
+
+
+def set_theme(name):
+    _load()["theme"] = name
+    _save()
+
+
 def record(display):
     """Count a commit of this entry and persist."""
     st = _load()
